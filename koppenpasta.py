@@ -622,7 +622,7 @@ def color(inarray, outlist, inarraysea=Sea_Zones):
 
 #opening info
 print('''
-NetCDF to Koppen Climate Zones
+NetCDF to Koppen Climate Zones v1.0
 Script written 2021 by Nikolai Hersfeldt
     of worldbuildingpasta.blogspot.com
 For use with NetCDF output files from ExoPlaSim GCM
