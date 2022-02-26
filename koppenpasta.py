@@ -118,7 +118,7 @@ HTropRainForest=98
 Sea_Zones=1
 
 #defines a function to convert climate zone array to a list of rgb values
-#there may be a better way to do this with dictionaries, but it works
+#there may be a better way to do this with dictionaries, but this works for now
 def color(inarray, outlist, inarraysea=Sea_Zones):
     for y in range(latl):
         for x in range(lonl):
@@ -622,7 +622,7 @@ def color(inarray, outlist, inarraysea=Sea_Zones):
 
 #opening info
 print('''
-NetCDF to Koppen Climate Zones v1.0
+NetCDF to Koppen Climate Zones v1.1
 Script written 2021 by Nikolai Hersfeldt
     of worldbuildingpasta.blogspot.com
 For use with NetCDF output files from ExoPlaSim GCM
@@ -631,29 +631,49 @@ For use with NetCDF output files from ExoPlaSim GCM
 
 #set path to current location
 path = os.path.join(os.path.dirname(__file__), '')
+in_files = []
+in_num = 0
 
 #ask for input file
 while True:
-    infile = path+input('Input NetCDF filename: ')
+    infile = path+input('Input NetCDF filename or folder of files: ')
     if os.path.exists(infile):
-        break
+        if os.path.isdir(infile):
+            in_num = 0
+            found = False
+            for f in os.listdir(infile):
+                if f.endswith(".nc"):
+                    in_files.append(infile+"/"+f)
+                    in_num += 1
+                    found = True
+                    print(" Found "+str(f))
+            if found:
+                print("Found all files")
+                break
+            else:
+                print("No files found in "+str(infile))
+        else:
+            in_num = 0
+            print('File found')
+            break
     print('No file found at '+str(infile))
-print('File found')
+    
+
 
 #Prompts for configuration
 #The yes/no prompts are intentionally flexible; any input containing 'y' or '1' will be read as 'yes', anything else will be read as 'no'
 res = input('Advanced setup? (y/n): ')
 if res in ('y') or res in ('1'):
     res = 1
-    in_num = 0
     extra = input('''
 Additional Input Files
 If added, values across all years will be averaged together.
 CAUTION: All files must have same resolution and number of months.
 Add additional inputs? (y/n): ''')
     if extra in ('y') or extra in ('1'):
-        in_num = 1
-        in_files = [infile]
+        if len(in_files) < 1:
+            in_files.apped(infile)
+            in_num += 1
         while True:
             nextin = path+input('Add input file ("stop" for no more input files): ')
             if nextin in ('stop'):
@@ -767,15 +787,15 @@ Land/Sea Blend
 1: Do not blend: Produce distinct land and sea climate maps (appropriate for final output, so you can
     combine them with a high-res land/sea mask yourself)
 Set Blend setting: '''))
-            #bin_num = int(input('''
-#Bin Size
-#Bins adjacent "months" in the NetCDF file together.
-#e.g. if you have a NetCDF file with 36 months, a value of "3" will average together data from every 3 months
-    #to produce 12 months, which will then be used for determining climate zones.
-#Ideally there should be a whole number of bins per year.
-#For an input of "1" or "0" the script will not bin months together.
-#Set Bin Size: '''))
-            bin_num = 0     #not ready for public use, hasn't worked properly in testing yet.
+            bin_num = int(input('''
+Bin Size
+Bins adjacent "months" in the NetCDF file together.
+e.g. if you have a NetCDF file with 36 months, a value of "3" will average together data from every 3 months
+    to produce 12 months, which will then be used for determining climate zones.
+Ideally there should be a whole number of bins per year.
+For an input of "1" or "0" the script will not bin months together.
+Set Bin Size: '''))
+            #bin_num = 0     #not ready for public use, hasn't worked properly in testing yet.
             if bin_num < 2:
                 bin_num = 1
             interp = int(input('''
@@ -800,23 +820,21 @@ Add "dummy" sea ice? (y/n): ''')
                     dum_ice = 1
                 else:
                     dum_ice = 0
-                #use_topo = input('''
-#Adjust Temperature to Topography
-#Allows you to upload a higher-resolution heightmap, and then after interpolation, temperature is adjusted
-    #based on deviation between that heightmap and an interpolated heightmap from the model output.
-#Precipitation is not adjusted, so this is still not as accurate as higher-resolution modelling,
-    #but it is an improvement and gives the map some "texture".
-#Upload Topography? (y/n): ''')
-                #if use_topo in ('y') or use_topo in ('1'):
-                    #use_topo = 1
-                #else:
-                    #use_topo = 0
-                use_topo = 0    #this function is not ready for public use yet, the adjustment has been way too strong in testing and I'm still exploring why.
+                use_topo = input('''
+Adjust Temperature to Topography
+Allows you to upload a higher-resolution heightmap, and then after interpolation, temperature is adjusted
+    based on deviation between that heightmap and an interpolated heightmap from the model output.
+Precipitation is not adjusted, so this is still not as accurate as higher-resolution modelling,
+    but it is an improvement and gives the map some "texture".
+Upload Topography? (y/n): ''')
+                if use_topo in ('y') or use_topo in ('1'):
+                    use_topo = 1
+                else:
+                    use_topo = 0
             else:
                 dum_ice = 0
                 use_topo = 0
     else:
-        in_num = 0
         land_type = 0
         sea_type = 0
         color_type = 0
@@ -849,31 +867,6 @@ Interpolated map resolution:''')
         maxel = float(input('Highest Map Elevation (m): '))
         minel = float(input('Lowest Map Elevation (m): '))
         gravity = float(input('Surface Gravity (m/s^2): '))
-        molarm = input('''Atmosphere Mean Molar Mass
-Used for determining the gas constant, which is then used to determined the height of atmospheric layers
-    to construct a near-surface lapse rate (change of temperature with altitude) per cell.
-You can calculate this by looking up the molar mass for each of you atmospheric gasses,
-    multiply them each by their partial pressure in the atmosphere,
-    and then divide the result by the total surface pressure
-    (you should also see it in konsole when you start running a model)
-Alternatively, type "in" to input partial pressures for each atmospheric gas, as in ExoPlaSim scripts
-(it's 28.96 g/mol for Earth, by the way)
-Mean molar mass (g/mol): ''')
-        if molarm in ('in'):
-            pH2 = float(input(' pH2: '))
-            pN2 = float(input(' pN2: '))
-            pO2 = float(input(' pO2: '))
-            pHe = float(input(' pHe: '))
-            pNe = float(input(' pNe: '))
-            pAr = float(input(' pAr: '))
-            pKr = float(input(' pKr: '))
-            pCO2 = float(input(' pCO2: '))
-            pH2O = float(input(' pH2O: '))
-            molarm = (pH2*2.016 + pN2*28.013 + pO2*31.999 + pHe*4.003 + pNe*20.179 + pAr*39.948 + pKr*83.80 + pCO2*44.01 + pH2O*18.02) / (pH2 + pN2 + pO2 + pHe + pNe + pAr + pKr + pCO2 + pH2O)
-            print('Mean molar mass calculated as ' + str(molarm) + ' g/mol')
-        else:
-            molarm = float(molarm)
-        gascon = 8314.463 / molarm
 
     if res == 1:
         if cfg_op == 1:
@@ -1035,8 +1028,10 @@ Output map name: ''')
 
     #retrieve data from NetCDF file
     print('Retrieving Data...')
-
-    ds = nc.Dataset(infile)
+    if in_num == 0:
+        ds = nc.Dataset(infile)
+    else:
+        ds = nc.Dataset(in_files[0])
     time = ds['time'][:]    #month
     lat = ds['lat'][:]  #latitude
     lon = ds['lon'][:]  #longitude
@@ -1052,10 +1047,6 @@ Output map name: ''')
     lonl = len(lon)
     latl = len(lat)
 
-    if use_topo ==1:
-        lev = ds['lev'][:]  #midpoint sigma values of atmospheric layers
-        siglay = lev[-1]    #sigma value of the lowest layer
-
     if in_num == 0:
         tas_ar = ds['tas'][:]    #2-meter air temperature, Kelvin
         pr_ar = ds['pr'][:]    #precipitation, meters/second
@@ -1063,8 +1054,6 @@ Output map name: ''')
         sic_ar = ds['sic'][:]  #fractional sea ice cover
         if use_topo == 1:
             grnz_ar = ds['grnz'][:]   #surface geopotential, meters^2/seconds^2
-            ta_ar = ds['ta'][:,-1,:,:]     #air temperature of the lowest layer, Kelvin
-            hus_ar = ds['hus'][:,-1,:,:]    #specific humidity of the lowest layer, kg/kg
         if sum_def == 1:
             czen_ar = ds['czen'][:]   #cosine of solar zenith angle
         if use_ts == 1:
@@ -1076,8 +1065,6 @@ Output map name: ''')
         sic_raw = np.empty((in_num,timefull,latl,lonl))
         if use_topo == 1:
             grnz_raw = np.empty((in_num,timefull,latl,lonl))
-            ta_raw = np.empty((in_num,timefull,latl,lonl))
-            hus_ar = np.empty((in_num,timefull,latl,lonl))
         if sum_def == 1:
             czen_raw = np.empty((in_num,timefull,latl,lonl))
         if use_ts == 1:
@@ -1090,8 +1077,6 @@ Output map name: ''')
             sic_raw[n,:,:,:] = ds['sic'][:]
             if use_topo == 1:
                 grnz_raw[n,:,:,:] = ds['grnz'][:]
-                ta_raw[n,:,:,:] = ds['ta'][:,-1,:,:]
-                hus_raw[n,:,:,:] = ds['hus'][:,-1,:,:]
             if sum_def == 1:
                 czen_raw[n,:,:,:] = ds['czen'][:]
             if use_ts == 1:
@@ -1102,13 +1087,12 @@ Output map name: ''')
         sic_ar = np.mean(sic_raw, axis=0)
         if use_topo == 1:
             grnz_ar = np.mean(grnz_raw, axis=0)
-            ta_ar = np.mean(ta_raw, axis=0)
-            hus_ar = np.mean(hus_raw, axis=0)
         if sum_def == 1:
             czen_ar = np.mean(czen_raw, axis=0)
         if use_ts == 1:
             ts_ar = np.mean(ts_raw, axis=0)
-
+    
+    
     if use_topo == 1:
         grnz_bin = np.mean(grnz_ar, axis=0)    #geopotential is averaged into a 2d array, as it doesn't vary with time
 
@@ -1121,29 +1105,23 @@ Output map name: ''')
         sic_bin = np.empty((timel,latl,lonl))
         if sum_def == 1:
             czen_bin = np.empty((timel,latl,lonl))
-        if use_topo == 1:
-            ta_bin = np.empty((timel,latl,lonl))
-            hus_bin = np.empty((timel,latl,lonl))
         if use_ts == 1:
             ts_bin = np.empty((timel,latl,lonl))
-        for t in range(timel-1):
-            t_start = ((t)*bin_num)     #determines the month range to put in each bin
+        for t in range(timel):
+            t_start = (t*bin_num)     #determines the month range to put in each bin
             t_end = t_start + bin_num
-            if t_end > timel:   #if there aren't enough months to fill last bin, loop around to start of year
-                t_end -= timel
+            if t_end > timefull:   #if there aren't enough months to fill last bin, loop around to start of year
+                t_end -= timefull
                 for x in range(lonl):
                     for y in range(latl):
-                        tas_bin[t,y,x] = stat.mean(tas_ar[t_start:,y,x],tas_ar[:t_end,y,x])
-                        pr_bin[t,y,x] = stat.mean(pr_ar[t_start:,y,x],pr_ar[:t_end,y,x])
-                        lsm_bin[t,y,x] = stat.mean(lsm_ar[t_start:,y,x],lsm_ar[:t_end,y,x])
-                        sic_bin[t,y,x] = stat.mean(sic_ar[t_start:,y,x],sic_ar[:t_end,y,x])
+                        tas_bin[t,y,x] = (sum(tas_ar[t_start:,y,x]) + sum(tas_ar[:t_end,y,x])) / bin_num
+                        pr_bin[t,y,x] = (sum(pr_ar[t_start:,y,x]) + sum(pr_ar[:t_end,y,x])) / bin_num
+                        lsm_bin[t,y,x] = (sum(lsm_ar[t_start:,y,x]) + sum(lsm_ar[:t_end,y,x])) / bin_num
+                        sic_bin[t,y,x] = (sum(sic_ar[t_start:,y,x]) + sum(sic_ar[:t_end,y,x])) / bin_num
                         if sum_def == 1:
-                            czen_bin[t,y,x] = stat.mean(czen_ar[t_start:,y,x],czen_ar[:t_end,y,x])
-                        if use_topo == 1:
-                            ta_bin[t,y,x] = stat.mean(ta_ar[t_start:,y,x],ta_ar[:t_end,y,x])
-                            hus_bin[t,y,x] = stat.mean(hus_ar[t_start:,y,x],hus_ar[:t_end,y,x])
+                            czen_bin[t,y,x] = (sum(czen_ar[t_start:,y,x]) + sum(czen_ar[:t_end,y,x])) / bin_num
                         if use_ts == 1:
-                            ts_bin[t,y,x] = stat.mean(ts_ar[t_start:,y,x],ts_ar[:t_end,y,x])
+                            ts_bin[t,y,x] = (sum(ts_ar[t_start:,y,x]) + sum(ts_ar[:t_end,y,x])) / bin_num
             else:
                 for x in range(lonl):
                     for y in range(latl):
@@ -1153,9 +1131,6 @@ Output map name: ''')
                         sic_bin[t,y,x] = stat.mean(sic_ar[t_start:t_end,y,x])
                         if sum_def == 1:
                             czen_bin[t,y,x] = stat.mean(czen_ar[t_start:t_end,y,x])
-                        if use_topo == 1:
-                            ta_bin[t,y,x] = stat.mean(ta_ar[t_start:t_end,y,x])
-                            hus_bin[t,y,x] = stat.mean(hus_ar[t_start:t_end,y,x])
                         if use_ts == 1:
                             ts_bin[t,y,x] = stat.mean(ts_ar[t_start:t_end,y,x])
     else:   #if months aren't binned, just rename the data arrays for use in the next section
@@ -1165,9 +1140,6 @@ Output map name: ''')
         sic_bin = sic_ar
         if sum_def == 1:
             czen_bin = czen_ar
-        if use_topo == 1:
-            ta_bin = ta_ar
-            hus_bin = hus_ar
         if use_ts == 1:
             ts_bin = ts_ar
 
@@ -1223,13 +1195,56 @@ Output map name: ''')
                                     sic_bin[t,y,x] = max(sic_bin[t,y,x],sic_bin[t,y,x+1])
                                     
         if use_topo == 1:
-            print(' Calculating atmospheric lapse rate...')
+            print(' Estimating atmospheric lapse rate...')
             lapse_bin = np.empty((timel,latl,lonl))
             for t in range(timel):
-                for x in range(lonl):
-                    for y in range(latl):
-                        lapse_bin[t,y,x] = (ta_bin[t,y,x] - tas_bin[t,y,x]) / (math.log(1/siglay) * ta_bin[t,y,x] * (1 + 0.61 * hus_bin[t,y,x]) * gascon/gravity - 2)
-                            #determines the near-surface lapse rate in K/m per temperature data and the hypsometric equation
+                lat_avgs = []
+                for y in range(latl):
+                    lapses = []
+                    for x in range(lonl):   #first, find appropriate neighbor cells
+                        n = 0
+                        nsum = 0
+                        if x == 0:
+                            l = lonl-1
+                        else:
+                            l = x-1
+                        if x == lonl-1:
+                            r = 0
+                        else:
+                            r = x+1
+                        if y == 0:
+                            neigh = [(l,y), (l,y+1), (x,y+1), (r,y+1), (r,y)]
+                        elif y == latl-1: 
+                            neigh = [(l,y), (l,y-1), (x,y-1), (r,y-1), (r,y)]
+                        else:
+                            neigh= [(l,y), (l,y+1), (x,y+1), (r,y+1), (r,y), (l,y-1), (x,y-1), (r,y-1)]
+                        for ne in neigh:
+                            if abs(grnz_bin[ne[1],ne[0]] - grnz_bin[y,x]) > 981:   #checks that there's at least 100 meter equivalent difference in elevation to make the comparison
+                                n += 1
+                                nsum += (tas_bin[t,ne[1],ne[0]] - tas_bin[t,y,x]) / (grnz_bin[ne[1],ne[0]] - grnz_bin[y,x])
+                        if n == 0:
+                            lapse_bin[t,y,x] = 10000  #obviously unphysical placeholder if there isn't enough data
+                        else:
+                            lapse_bin[t,y,x] = nsum / n   #otherwise put in average
+                            lapses.append(lapse_bin[t,y,x])
+                    if len(lapses) > 0:
+                        lat_avgs.append(stat.mean(lapses[:]))
+                    else:
+                        lat_avgs.append(10000)
+                n = 0
+                tot_avg = 0
+                for avg in lat_avgs:
+                    if avg < 1000:
+                        n += 1
+                        tot_avg += avg
+                tot_avg /= n
+                for y in range(latl):
+                    if lat_avgs[y] > 1000:
+                        lat_avgs[y] = tot_avg   #use global average if there's no data in the whole row
+                    for x in range(lonl):
+                        if lapse_bin[t,y,x] > 1000:
+                            lapse_bin[t,y,x] = lat_avgs[y]  #run through every cell again and replace empty data with latitudinal averages
+                        
             
         print(' Reticulating splines...')
         tas_interp = np.empty((timel,latl*interp,lonl*interp))     #create our upscaled data arrays
@@ -1238,7 +1253,7 @@ Output map name: ''')
         sic_interp = np.empty((timel,latl*interp,lonl*interp))
         if use_topo == 1:
             grnz_interp = np.empty((latl*interp,lonl*interp))
-            lapse_interp = np.empty((latl*interp,lonl*interp))
+            lapse_interp = np.empty((timel,latl*interp,lonl*interp))
         if sum_def == 1:
             czen_interp = np.empty((timel,latl*interp,lonl*interp))
         if use_ts == 1:
@@ -1323,7 +1338,7 @@ Output map name: ''')
                     elevation = hmap.getpixel((x,y)) * (maxel - minel)/255 + minel
                     elevation *= gravity
                     for t in range(timel):
-                        temp_adj = lapse[t,y,x] * (elevation - grnz[y,x] + 2)
+                        temp_adj = lapse[t,y,x] * (elevation - grnz[y,x])
                         tas[t,y,x] = tas[t,y,x] + temp_adj
                         ts[t,y,x] = ts[t,y,x] - lapse[t,y,x] * grnz[y,x]
     else:   #if no interpolation is used, just rename the data arrays for use in next section
@@ -1448,8 +1463,8 @@ Output map name: ''')
                 Max_Sum_Precip_ar[x,y] = max(Precips_li[Sum_start:Sum_start+halfl])*2592000000
                 Min_Sum_Precip_ar[x,y] = min(Precips_li[Sum_start:Sum_start+halfl])*2592000000
                 if timodd == 1 and Sum_add == 1:    #again, roughly attempt to account for odd number of months
-                    Max_Win_Precip_ar[x,y] = max(Precips_li[Sum_start+halfl+1:Sum_start+timel+1])*2592000000
-                    Min_Win_Precip_ar[x,y] = min(Precips_li[Sum_start+halfl+1:Sum_start+timel+1])*2592000000
+                    Max_Win_Precip_ar[x,y] = max(Precips_li[Sum_start+halfl+1:Sum_start+timel])*2592000000
+                    Min_Win_Precip_ar[x,y] = min(Precips_li[Sum_start+halfl+1:Sum_start+timel])*2592000000
                 else:
                     Max_Win_Precip_ar[x,y] = max(Precips_li[Sum_start+halfl:Sum_start+timel])*2592000000
                     Min_Win_Precip_ar[x,y] = min(Precips_li[Sum_start+halfl:Sum_start+timel])*2592000000
@@ -1491,7 +1506,6 @@ Output map name: ''')
                     Min_Seatemp = Min_Seatemp_ar[x,y]
                     if sea_def == 1:
                         Max_Seatemp = Max_Seatemp_ar[x,y]
-            
             #land zones
             
             #Groups only
@@ -1832,13 +1846,10 @@ Operation Complete""")
             print (' and ' + str(path) + str(output_name) + '_sea.png')
     else:
         print('Map Written to ' + str(path) + str(output_name) + '.png')
-    if res == 1:
-        redo = input("""
+    redo = input("""
 Produce another map with same inputs? (y/n): """)
-        if redo in ('y') or redo in ('1'):
-            pass
-        else:
-            break
+    if redo in ('y') or redo in ('1'):
+        pass
     else:
         break
 
