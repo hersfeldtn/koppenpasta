@@ -622,7 +622,7 @@ def color(inarray, outlist, inarraysea=Sea_Zones):
 
 #opening info
 print('''
-NetCDF to Koppen Climate Zones v1.1
+NetCDF to Koppen Climate Zones v1.1.1
 Script written 2021 by Nikolai Hersfeldt
     of worldbuildingpasta.blogspot.com
 For use with NetCDF output files from ExoPlaSim GCM
@@ -672,15 +672,28 @@ CAUTION: All files must have same resolution and number of months.
 Add additional inputs? (y/n): ''')
     if extra in ('y') or extra in ('1'):
         if len(in_files) < 1:
-            in_files.apped(infile)
+            in_files.append(infile)
             in_num += 1
         while True:
-            nextin = path+input('Add input file ("stop" for no more input files): ')
+            nextin = path+input('Add input file or folder ("stop" for no more inputs): ')
             if nextin in ('stop'):
                 break
             if os.path.exists(nextin):
-                in_files.append(nextin)
-                in_num += 1
+                if os.path.isdir(nextin):
+                    found = False
+                    for f in os.listdir(nextin):
+                        if f.endswith(".nc"):
+                            in_files.append(nextin+"/"+f)
+                            in_num += 1
+                            found = True
+                            print(" Found "+str(f))
+                    if found:
+                        print("Found all files in "+str(nextin))
+                    else:
+                        print("No files found in "+str(nextin))
+                else:
+                    in_files.append(nextin)
+                    in_num += 1
             else:
                 print('No file found at '+str(nextin))
         print('All files found')
@@ -848,7 +861,10 @@ Upload Topography? (y/n): ''')
 
 
     if use_topo == 1:            
-        ds = nc.Dataset(infile)
+        if in_num > 0:
+            ds = nc.Dataset(in_files[0])
+        else:
+            ds = nc.Dataset(infile)
         lat = ds['lat'][:]
         maph = len(lat) * interp
         mapw = maph * 2
