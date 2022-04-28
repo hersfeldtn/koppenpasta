@@ -3,8 +3,16 @@ from nco import Nco
 from netCDF4 import Dataset as ds
 
 #Main Function
-def main(in_files, outname, ann_avg, offset, rotate):
+def main(in_files="", outname='out', ann_avg=0, offset=0, rotate=0):
     nco = Nco()
+    if isinstance(in_files, str):
+        in_files = [in_files]
+    for d in in_files:
+        if os.path.isdir(d):
+            for f in os.listdir(d):
+                if f.endswith(".nc"):
+                    in_files.append(d+"/"+f)
+            in_files.remove(d)
     print(" Averaging input files...")
     nco.nces(input=in_files, output = outname+".nc")
     if offset != 0:
