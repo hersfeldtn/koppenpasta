@@ -631,7 +631,7 @@ def color(inarray, outlist, latl, lonl, lsm, blend, land_type, sea_type, color_t
             outlist.append(rgb)
     return
 
-def MakeMap(in_files, output_name="output", cfg_loadname="",
+def MakeMap(in_files="", output_name="output", cfg_loadname="",
          land_type=0,
          sea_type=0,
          blend=0,
