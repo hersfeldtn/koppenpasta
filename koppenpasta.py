@@ -1519,14 +1519,14 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
         landmap = Image.new('RGB',(lonl,latl))
         landmap.putdata(Kop_rgb)
         savename = output_name + '_land.png'
-        landmap.save(path+savename)
+        landmap.save(savename)
         if sea_type != 5:
             Sea_rgb = []
             color(Sea_Zones, Sea_rgb, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path)
             seamap = Image.new('RGB',(lonl,latl))
             seamap.putdata(Sea_rgb)
             savename = output_name + '_sea.png'
-            seamap.save(path+savename)
+            seamap.save(savename)
 
     else:
         blend_rgb = []
