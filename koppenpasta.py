@@ -120,12 +120,24 @@ Sea_Zones=1
 #defines a function to convert climate zone array to a list of rgb values
 #there may be a better way to do this with dictionaries, but this works for now
 def color(inarray, outlist, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path, inarraysea=Sea_Zones):
+    if color_type == 3:
+        #Reads custom color list file
+        cfg = configparser.ConfigParser()
+        cfg.read(col_list_path)
+        fulkop = cfg['Full Koppen']
+        kopgroup = cfg['Koppen Groups']
+        redkop = cfg['Reduced Koppen']
+        noskop = cfg['Seasonless Koppen']
+        seazon = cfg['Sea Zones']
+        redsea = cfg['Reduced Sea']
+        hold = cfg['Holdridge']
+        nozon = cfg['Debug']
     for y in range(latl):
         for x in range(lonl):
             if blend == 1 or sea_type == 5:     #if blending is off or there is no sea, just reads from land climate array
                 clim = inarray[x,y]
             else:                               #otherwise use land/sea mask to determine whether to read from land or sea array 
-                if lsm[0,y,x] > 0.5:        #lsm should be binary, but just in case it isn't in the future I set the land/sea boundary at 0.5
+                if lsm[0,y,x] >= 0.5:        #lsm should be binary, but just in case it isn't in the future I set the land/sea boundary at 0.5
                     clim = inarray[x,y]
                 else:
                     clim = inarraysea[x,y]
@@ -415,17 +427,6 @@ def color(inarray, outlist, latl, lonl, lsm, blend, land_type, sea_type, color_t
                     rgb = (0,0,0)   #if no recognized climate zone is attached to this position, mark it black for debug purposes
                     
             elif color_type == 3:
-                #Reads custom color list file
-                cfg = configparser.ConfigParser()
-                cfg.read(col_list_path)
-                fulkop = cfg['Full Koppen']
-                kopgroup = cfg['Koppen Groups']
-                redkop = cfg['Reduced Koppen']
-                noskop = cfg['Seasonless Koppen']
-                seazon = cfg['Sea Zones']
-                redsea = cfg['Reduced Sea']
-                hold = cfg['Holdridge']
-                nozon = cfg['Debug']
                 if clim == Af:
                     rgb = fulkop.get('Af')
                 elif clim == Am:
@@ -645,6 +646,8 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
          maxel=0,
          minel=0,
          gravity=0,
+         blend_topo=0,
+         sealev=0,
          sum_def=0,
          temp_def=0,
          arid_def=0,
@@ -688,6 +691,8 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
         maxel = adv.getfloat('Max Elevation')
         minel = adv.getfloat('Min Elevation')
         gravity = adv.getfloat('Surface Gravity')
+        blend_topo = adv.geting('Blend by Topography Map')
+        sealev = adv.getfloat('Sea Level')
         defs = cfg['Climate Zone Definitions']
         sum_def = defs.getint('Summer Definition')
         temp_def = defs.getint('Temperate/Continental Boundary')
@@ -1018,20 +1023,28 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
             
             print(' Uploading Higher-Resolution Topogaphy...')
             hmap = Image.open(topo_path)
-            hmap = hmap.convert('F')
+            if blend_topo == 1:     #Use topo map to create new lsm
+                hmap_bin = hmap.convert('L')    #Convert to 8-bit to avoid floating-point issues
+                hmap_binext = hmap_bin.getextrema()
+                thresh = (sealev - minel) * (hmap_binext[1] - hmap_binext[0]) / (maxel - minel) #Find greyscale value corresponding to sea level
+                hmap_bin = hmap_bin.point( lambda p: 255 if p > thresh else 0 ) #Binarize to land/sea mask
+                hmap_bin = hmap_bin.resize((lonl,latl))
+                hmap_bin = hmap_bin.point( lambda p: 1 if p > 127 else 0 )  #Re-binarize after downscaling
+                topo_lsm = np.asarray(hmap_bin)
+                lsm = np.ones(lsm.shape) * topo_lsm[np.newaxis,:,:]    #Copy onto array with same shape as lsm
+            hmap = hmap.convert('F')    #Convert to float for precision on downscaling
             hmapext = hmap.getextrema()
             hmap = hmap.resize((lonl,latl))
             elev = np.asarray(hmap)
-            elev = elev * (maxel - minel) / (hmapext[1] - hmapext[0]) * gravity
+            elev = elev * (maxel - minel) / (hmapext[1] - hmapext[0]) * gravity #Scale to elevation range
+            elev = elev[np.newaxis,:,:] #Add time axis for appropriate broadcasting
+            grnz = grnz[np.newaxis,:,:]
             print(' Adjusting Temperature by Topography...')
-            for x in range(lonl):
-                for y in range(latl):
-                    elevation = elev[y,x]
-                    for t in range(timel):
-                        temp_adj = lapse[t,y,x] * (elevation - grnz[y,x])
-                        tas[t,y,x] = tas[t,y,x] + temp_adj
-                        if use_ts == 1:
-                            ts[t,y,x] = ts[t,y,x] - lapse[t,y,x] * grnz[y,x]
+            tas = tas + lapse * (elev - grnz)
+            if use_ts == 1:
+                ts = ts - lapse * (grnz - sealev * gravity)
+                
+                
     else:   #if no interpolation is used, just rename the data arrays for use in next section
         tas = tas_bin
         pr = pr_bin
@@ -1044,166 +1057,145 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
 
 
     print('Interpreting Data...')
-    #create our arrays for holding data
-    Avg_Temp_ar = np.empty((lonl,latl))
-    Max_Temp_ar = np.empty((lonl,latl))
-    Min_Temp_ar = np.empty((lonl,latl))
-    Total_Precip_ar = np.empty((lonl,latl))
-    Min_Precip_ar = np.empty((lonl,latl))
-    if land_type == 5:
-        Avg_Biot_ar = np.empty((lonl,latl))
-    elif land_type < 3 or land_type == 4:
-        Summer_Precip_ar = np.empty((lonl,latl))
-        Max_Sum_Precip_ar = np.empty((lonl,latl))
-        Min_Sum_Precip_ar = np.empty((lonl,latl))
-        Max_Win_Precip_ar = np.empty((lonl,latl))
-        Min_Win_Precip_ar = np.empty((lonl,latl))
-        Summer_Length_ar = np.empty((lonl,latl))
-    if sea_def != 1:    #only create sea ice data arrays if we're actually marking sea ice. I meant to add a lot of these time-saving measures but it's not really worth the effort
-        Max_Ice_ar = np.empty((lonl,latl))
-        Min_Ice_ar = np.empty((lonl,latl))
-        Avg_Ice_ar = np.empty((lonl,latl))
-    if use_ts == 1:
-        if sea_type == 2 or sea_type == 3:
-            Avg_Seatemp_ar = np.empty((lonl,latl))
-        else:
-            Min_Seatemp_ar = np.empty((lonl,latl))
-            if sea_def == 1:
-                Max_Seatemp_ar = np.empty((lonl,latl))
-
     #create our output arrays
     Koppen_Full = np.empty((lonl,latl),dtype=np.int8)
     Sea_Zones = np.empty((lonl,latl),dtype=np.int8)
 
-    #retrieve appropriate data for each point of the surface
-    for x in range(lonl):
-        if x == round(lonl/4):
-            print(' 25% done...')
-        elif x == round(lonl/2):
-            print(' 50% done...')
-        elif x == round(lonl*3/4):
-            print(' 75% done...')
-        for y in range(latl):
-            #copies data from NetCDF arrays to data arrays
-            Avg_Temp_ar[x,y] = stat.mean(tas[:,y,x])-273.15 #Converts to Celsius
-            Total_Precip_ar[x,y] = stat.mean(pr[:,y,x])*2592000000*12 #Converts to mm for whole year
-            Max_Temp_ar[x,y] = max(tas[:,y,x])-273.15
-            Min_Temp_ar[x,y] = min(tas[:,y,x])-273.15
-            Min_Precip_ar[x,y] = min(pr[:,y,x])*2592000000  #Converts to mm for month
-            if sea_def != 1:
-                Avg_Ice_ar[x,y] = stat.mean(sic[:,y,x])
-                Max_Ice_ar[x,y] = max(sic[:,y,x])
-                Min_Ice_ar[x,y] = min(sic[:,y,x])
-            if use_ts == 1:
-                if sea_type == 2 or sea_type == 3:
-                    Avg_Seatemp_ar[x,y] = stat.mean(ts[:,y,x])-273.15
-                else:
-                    Min_Seatemp_ar[x,y] = min(ts[:,y,x])-273.15
-                    if sea_def == 1:
-                        Max_Seatemp_ar[x,y] = max(ts[:,y,x])-273.15
+    #Extract appropriate averages and extremes with numpy operations
+    Avg_Temp_ar = np.mean(tas, axis=0)-273.15 #Converts to Celsius
+    Total_Precip_ar = np.mean(pr, axis=0)*2592000000*12 #Converts to mm for whole year
+    Max_Temp_ar = np.amax(tas, axis=0)-273.15
+    Min_Temp_ar = np.amin(tas, axis=0)-273.15
+    Min_Precip_ar = np.amin(pr, axis=0)*2592000000  #Converts to mm for month
+    if sea_def != 1:
+        Avg_Ice_ar = np.mean(sic, axis=0)
+        Max_Ice_ar = np.amax(sic, axis=0)
+        Min_Ice_ar = np.amin(sic, axis=0)
+    if use_ts == 1:
+        if sea_type == 2 or sea_type == 3:
+            Avg_Seatemp_ar = np.mean(ts, axis=0)-273.15
+        else:
+            Min_Seatemp_ar = np.amin(ts, axis=0)-273.15
+            if sea_def == 1:
+                Max_Seatemp_ar = np.amax(ts, axis=0)-273.15
+    if land_type == 5:       #routine specific to Holdridge Life Zone
+        Avg_Biot_ar = np.mean(np.clip(tas-273.15, 0, 30), axis=0) #constrains temperature range to [0,30] C
+    elif land_type < 3 or land_type == 4:
+        if timodd != 1:
+            if sum_def == 1:
+                long_ar = np.concatenate((czen,czen[:halfl,:,:]),axis=0)    #create 1.5-length array of zenith angle or temp
+            else:
+                long_ar = np.concatenate((tas,tas[:halfl,:,:]), axis=0)
+            sum_ar = np.sum(np.stack([long_ar[m:m+halfl] for m in range(halfl)], axis=0), axis=0)   #stack half-year slices together and then sum them together to produce array of total values over following half-year for each month
+            pr_long = np.concatenate((pr,pr),axis=0)    #create double-length array of precipitation
+            pr_stack = np.stack([pr_long[m:m+timel] for m in range(timel)], axis=0)     #stack full-year slices together starting on each month of the year
+            sum_max = np.argmax(sum_ar, axis=0)
+            precips_ar = np.empty((timel,latl,lonl))
+            for y in range(latl):       #Bit of an inefficient approach, but haven't quite figured out how to do this as a numpy operation
+                for x in range(lonl):
+                    precips_ar[:,y,x] = pr_stack[sum_max[y,x],:,y,x]    #choose appropriate slice corresponding to the maximum half-year total of indicator value
             
-            if land_type == 5:       #routine specific to Holdridge Life Zone
-                biot_ar = tas[:,y,x]
-                biot_li = biot_ar.tolist() 
-                for t in range(timel):  #constrains temperature range to [0,30] C
-                    biot_li[t] = biot_li[t] - 273.15
-                    biot_li[t] = min(biot_li[t],30)
-                    biot_li[t] = max(biot_li[t],0)
-                Avg_Biot_ar[x,y] = stat.mean(biot_li[:])
-            elif land_type < 3 or land_type == 4:
             
-                #Copies temperature/solar zenith and precipitation data twice to a list, to make the next steps easier
-                if sum_def == 1:
-                    zen_ar = czen[:,y,x]
-                    zen_li = zen_ar.tolist()
-                    zen_li.extend(zen_li[:])
-                else:
-                    Temps_ar = tas[:,y,x]
-                    Temps_li = Temps_ar.tolist()
-                    Temps_li.extend(Temps_li[:])
-                Precips_ar = pr[:,y,x]
-                Precips_li = Precips_ar.tolist()
-                Precips_li.extend(Precips_li[:])
-                
-                #Determines start of summer
-                for m in range(timel):
+            Summer_Precip_ar = np.mean(precips_ar[:halfl,:,:], axis=0)*2592000000*6
+            Max_Sum_Precip_ar = np.amax(precips_ar[:halfl,:,:], axis=0)*2592000000
+            Min_Sum_Precip_ar = np.amin(precips_ar[:halfl,:,:], axis=0)*2592000000
+            Max_Win_Precip_ar = np.amax(precips_ar[halfl:,:,:], axis=0)*2592000000
+            Min_Win_Precip_ar = np.amin(precips_ar[halfl:,:,:], axis=0)*2592000000
+    
+        else:   #For the moment, odd numbers of months requires reverting to the old method of iterating over arrays to find appropriate seasonal values
+            Summer_Precip_ar = np.empty((lonl,latl))
+            Max_Sum_Precip_ar = np.empty((lonl,latl))
+            Min_Sum_Precip_ar = np.empty((lonl,latl))
+            Max_Win_Precip_ar = np.empty((lonl,latl))
+            Min_Win_Precip_ar = np.empty((lonl,latl))
+            for y in range(latl):
+                for x in range(lonl):
                     if sum_def == 1:
-                        avg = stat.mean(zen_li[m:m+halfl])
-                        if timodd == 1:
+                        zen_ar = czen[:,y,x]
+                        zen_li = zen_ar.tolist()
+                        zen_li.extend(zen_li[:])
+                    else:
+                        Temps_ar = tas[:,y,x]
+                        Temps_li = Temps_ar.tolist()
+                        Temps_li.extend(Temps_li[:])
+                    Precips_ar = pr[:,y,x]
+                    Precips_li = Precips_ar.tolist()
+                    Precips_li.extend(Precips_li[:])
+                    #Determines start of summer
+                    for m in range(timel):
+                        if sum_def == 1:
+                            avg = stat.mean(zen_li[m:m+halfl])
                             if zen_li[m-1] > zen_li[m+halfl]:
                                 Sum_add = 0
                                 avg = (avg * halfl + zen_li[m-1])/(halfl+0.5)
                             else:
                                 Sum_add = 1
                                 avg = (avg * halfl + zen_li[m+halfl])/(halfl+0.5)
-                    else:
-                        avg = stat.mean(Temps_li[m:m+halfl])    #for each month, average the temps for the following half a year
-                        if timodd == 1:     #extra routine to kinda account for years with odd number of months
+                        else:
+                            avg = stat.mean(Temps_li[m:m+halfl])    #for each month, average the temps for the following half a year
                             if Temps_li[m-1] > Temps_li[m+halfl]:
                                 Sum_add = 0
                                 avg = (avg * halfl + Temps_li[m-1])/(halfl+0.5)
                             else:
                                 Sum_add = 1
                                 avg = (avg * halfl + Temps_li[m+halfl])/(halfl+0.5)
-                    if m == 0:      #start by assuming the first month is the start of summer
-                        max_avg = avg
-                        Sum_start = 0
-                        Sum_length = 0
-                    elif avg > max_avg:     #whenever the above process gives a higher average temp than the previous highest, make that the new start of summer
-                        Sum_start = m
-                        max_avg = avg
-                    if tas[m,y,x] > 283.15:  #meanwhile, add together months above 10 C to determine "summer length" used for some zones
-                        Sum_length = Sum_length+1
-                
-                #Extracts relevant seasonal precipitation data
-                Summer_Precip_ar[x,y] = stat.mean(Precips_li[Sum_start:Sum_start+halfl])*2592000000*6
-                Max_Sum_Precip_ar[x,y] = max(Precips_li[Sum_start:Sum_start+halfl])*2592000000
-                Min_Sum_Precip_ar[x,y] = min(Precips_li[Sum_start:Sum_start+halfl])*2592000000
-                if timodd == 1 and Sum_add == 1:    #again, roughly attempt to account for odd number of months
-                    Max_Win_Precip_ar[x,y] = max(Precips_li[Sum_start+halfl+1:Sum_start+timel])*2592000000
-                    Min_Win_Precip_ar[x,y] = min(Precips_li[Sum_start+halfl+1:Sum_start+timel])*2592000000
-                else:
-                    Max_Win_Precip_ar[x,y] = max(Precips_li[Sum_start+halfl:Sum_start+timel])*2592000000
-                    Min_Win_Precip_ar[x,y] = min(Precips_li[Sum_start+halfl:Sum_start+timel])*2592000000
-                Summer_Length_ar[x,y] = Sum_length
-                if timodd == 1:
-                    if Sum_add == 0:
-                        Summer_Precip_ar[x,y] = Summer_Precip_ar[x,y] + Precips_li[Sum_start-1]*2592000000*6/timel
+                        if m == 0:      #start by assuming the first month is the start of summer
+                            max_avg = avg
+                            Sum_start = 0
+                            Sum_length = 0
+                        elif avg > max_avg:     #whenever the above process gives a higher average temp than the previous highest, make that the new start of summer
+                            Sum_start = m
+                            max_avg = avg
+                    
+                    #Extracts relevant seasonal precipitation data
+                    Summer_Precip_ar[y,x] = stat.mean(Precips_li[Sum_start:Sum_start+halfl])*2592000000*6
+                    Max_Sum_Precip_ar[y,x] = max(Precips_li[Sum_start:Sum_start+halfl])*2592000000
+                    Min_Sum_Precip_ar[y,x] = min(Precips_li[Sum_start:Sum_start+halfl])*2592000000
+                    if Sum_add == 1:
+                        Max_Win_Precip_ar[y,x] = max(Precips_li[Sum_start+halfl+1:Sum_start+timel])*2592000000
+                        Min_Win_Precip_ar[y,x] = min(Precips_li[Sum_start+halfl+1:Sum_start+timel])*2592000000
                     else:
-                        Summer_Precip_ar[x,y] = Summer_Precip_ar[x,y] + Precips_li[Sum_start+halfl]*2592000000*6/timel
+                        Max_Win_Precip_ar[y,x] = max(Precips_li[Sum_start+halfl:Sum_start+timel])*2592000000
+                        Min_Win_Precip_ar[y,x] = min(Precips_li[Sum_start+halfl:Sum_start+timel])*2592000000
+                    if Sum_add == 0:
+                        Summer_Precip_ar[y,x] = Summer_Precip_ar[y,x] + Precips_li[Sum_start-1]*2592000000*6/timel
+                    else:
+                        Summer_Precip_ar[y,x] = Summer_Precip_ar[y,x] + Precips_li[Sum_start+halfl]*2592000000*6/timel
+            
+        Summer_Length_ar = np.sum(np.where(tas>283.15,1,0),axis=0) #add together months above 10 C to determine "summer length" used for some zones
 
     #Determines climate zones from data
     #Identifying both land and sea zones for every cell is perhaps inefficient for blended outputs, but I presume that anyone doing a very high-resolution, interpolated output is probably going to want unblended outputs anyway
     print('Determining Climate Zones...')
-    for x in range(lonl):
-        for y in range(latl):
+    for y in range(latl):
+        for x in range(lonl):
             
             #find data for specific location
-            Avg_Temp = Avg_Temp_ar[x,y]
-            Max_Temp = Max_Temp_ar[x,y]
-            Min_Temp = Min_Temp_ar[x,y]
-            Total_Precip = Total_Precip_ar[x,y]
-            Min_Precip = Min_Precip_ar[x,y]
+            Avg_Temp = Avg_Temp_ar[y,x]
+            Max_Temp = Max_Temp_ar[y,x]
+            Min_Temp = Min_Temp_ar[y,x]
+            Total_Precip = Total_Precip_ar[y,x]
+            Min_Precip = Min_Precip_ar[y,x]
             if land_type == 5:
-                Avg_Biot = Avg_Biot_ar[x,y]
+                Avg_Biot = Avg_Biot_ar[y,x]
             elif land_type < 3 or land_type == 4:
-                Summer_Precip = Summer_Precip_ar[x,y]
-                Max_Sum_Precip = Max_Sum_Precip_ar[x,y]
-                Min_Sum_Precip = Min_Sum_Precip_ar[x,y]
-                Max_Win_Precip = Max_Win_Precip_ar[x,y]
-                Min_Win_Precip = Min_Win_Precip_ar[x,y]
-                Summer_Length = Summer_Length_ar[x,y]
+                Summer_Precip = Summer_Precip_ar[y,x]
+                Max_Sum_Precip = Max_Sum_Precip_ar[y,x]
+                Min_Sum_Precip = Min_Sum_Precip_ar[y,x]
+                Max_Win_Precip = Max_Win_Precip_ar[y,x]
+                Min_Win_Precip = Min_Win_Precip_ar[y,x]
+                Summer_Length = Summer_Length_ar[y,x]
             if sea_def != 1:    #only pull up sea ice data if we're actually marking sea ice
-                Max_Ice = Max_Ice_ar[x,y]
-                Min_Ice = Min_Ice_ar[x,y]
-                Avg_Ice = Avg_Ice_ar[x,y]
+                Max_Ice = Max_Ice_ar[y,x]
+                Min_Ice = Min_Ice_ar[y,x]
+                Avg_Ice = Avg_Ice_ar[y,x]
             if use_ts == 1:
                 if sea_type == 2 or sea_type == 3:
-                    Avg_Seatemp = Avg_Seatemp_ar[x,y]
+                    Avg_Seatemp = Avg_Seatemp_ar[y,x]
                 else:
-                    Min_Seatemp = Min_Seatemp_ar[x,y]
+                    Min_Seatemp = Min_Seatemp_ar[y,x]
                     if sea_def == 1:
-                        Max_Seatemp = Max_Seatemp_ar[x,y]
+                        Max_Seatemp = Max_Seatemp_ar[y,x]
             else:
                 if sea_type == 2 or sea_type == 3:
                     Avg_Seatemp = Avg_Temp
@@ -1212,307 +1204,311 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
                     if sea_def == 1:
                         Max_Seatemp = Max_Temp
             #land zones
-            
-            #Groups only
-            
-            if land_type == 4:
-            
-                #determine threshold for arid zones
-                if Summer_Precip > Total_Precip*0.7:
-                    adjust = 280
-                elif Summer_Precip > Total_Precip*0.3:
-                    adjust = 140
-                else:
-                    adjust = 0
-                Arid_threshold = Avg_Temp*20 + adjust
+            if blend == 1 or lsm[0,y,x] >= 0.5:   #Only check for land zones if necessary
                 
-                #Find Koppen Group
-                if Total_Precip < Arid_threshold and (Max_Temp > 10 or (Max_Temp > 0 and ice_def != 2) or (ice_def != 1 and ice_def != 2)):  #the and/or functions are accounting for different definitions set at the start
-                    clim = B
-                elif Max_Temp < 10:
-                    clim = E
-                elif Min_Temp > 18:
-                    clim = A
-                elif Min_Temp > 0 or (temp_def == 1 and Avg_Temp > -3):
-                    clim = C
-                else:
-                    clim = D
-            
-            #seasonless zones
-            
-            elif land_type == 3:
-                if Total_Precip < Avg_Temp*20+140 and (Avg_Temp > 10 or (Avg_Temp > 0 and ice_def != 2) or (ice_def != 1 and ice_def != 2)):
-                    if Total_Precip < Avg_Temp*10+70:
-                        if Avg_Temp > 18 or (arid_def != 1 and Avg_Temp > 0) or (arid_def != 1 and temp_def == 1 and Avg_Temp > -3):
-                            clim = HotDesertnos
-                        else:
-                            clim = ColdDesertnos
+                #Groups only
+                
+                if land_type == 4:
+                
+                    #determine threshold for arid zones
+                    if Summer_Precip > Total_Precip*0.7:
+                        adjust = 280
+                    elif Summer_Precip > Total_Precip*0.3:
+                        adjust = 140
                     else:
-                        if Avg_Temp > 18 or (arid_def != 1 and Avg_Temp > 0) or (arid_def != 1 and temp_def == 1 and Avg_Temp > -3):
-                            clim = HotSteppenos
-                        else:
-                            clim = ColdSteppenos
-                elif Avg_Temp < 10:
-                    if Avg_Temp < 0:
-                        clim = IceCapnos
-                    else:
-                        clim = Tundranos
-                elif Avg_Temp > 18:
-                    if Total_Precip/12 > 60:
-                        clim = TropRainforestnos
-                    else:
-                        clim = TropSavannanos
-                else:
-                    clim = Oceanicnos
+                        adjust = 0
+                    Arid_threshold = Avg_Temp*20 + adjust
                     
-            #Full Koppen set
-            
-            elif land_type < 3:
-                #determine threshold for arid zones
-                if Summer_Precip > Total_Precip*0.7:
-                    adjust = 280
-                elif Summer_Precip > Total_Precip*0.3:
-                    adjust = 140
-                else:
-                    adjust = 0
-                Arid_threshold = Avg_Temp*20 + adjust
+                    #Find Koppen Group
+                    if Total_Precip < Arid_threshold and (Max_Temp > 10 or (Max_Temp > 0 and ice_def != 2) or (ice_def != 1 and ice_def != 2)):  #the and/or functions are accounting for different definitions set at the start
+                        clim = B
+                    elif Max_Temp < 10:
+                        clim = E
+                    elif Min_Temp > 18:
+                        clim = A
+                    elif Min_Temp > 0 or (temp_def == 1 and Avg_Temp > -3):
+                        clim = C
+                    else:
+                        clim = D
                 
-                #Finds Koppen zone
-                if Total_Precip < Arid_threshold and (Max_Temp > 10 or (Max_Temp > 0 and ice_def != 2) or (ice_def != 1 and ice_def != 2)):
-                    if Total_Precip < Arid_threshold/2:
-                        if (arid_def != 1 and Min_Temp > 0) or (arid_def == 1 and Avg_Temp > 18) or (arid_def != 1 and temp_def == 1 and Min_Temp > -3):
-                            clim = BWh
-                        else:
-                            clim = BWk
-                    else:
-                        if (arid_def != 1 and Min_Temp > 0) or (arid_def == 1 and Avg_Temp > 18) or (arid_def != 1 and temp_def == 1 and Min_Temp > -3):
-                            clim = BSh
-                        else:
-                            clim = BSk
-                elif Max_Temp < 10:
-                    if Max_Temp < 0:
-                        clim = EF
-                    else:
-                        clim = ET
-                elif Min_Temp > 18:
-                    if Min_Precip > 60:
-                        clim = Af
-                    elif Min_Precip > 100-Total_Precip/25:
-                        clim = Am
-                    else:
-                        if Summer_Precip < Total_Precip/2:
-                            clim = As
-                        else:
-                            clim = Aw
-                elif Min_Temp > 0 or (temp_def == 1 and Avg_Temp > -3):
-                    if (Min_Sum_Precip < 30 or (med_def == 1 and Min_Sum_Precip < 40)) and Min_Win_Precip > Min_Sum_Precip and Max_Win_Precip > Min_Sum_Precip*3 and ((add_def == 1 or add_def == 3) or ((add_def == 0 or add_def == 2) and Summer_Precip < Total_Precip*0.5)) and (prio_def == 0 or (prio_def == 1 and ((wet_def != 1 and Max_Sum_Precip <= Min_Win_Precip*10) or (wet_def == 1 and Summer_Precip <= Total_Precip*0.7)))):
-                        if Summer_Length < thirdl:
-                            clim = Csc
-                        elif Max_Temp > 22:
-                            clim = Csa
-                        else:
-                            clim = Csb
-                    elif ((wet_def != 1 and Max_Sum_Precip > Min_Win_Precip*10) or (wet_def == 1 and Summer_Precip > Total_Precip*0.7)) and ((add_def == 0 or add_def == 3) or ((add_def == 1 or add_deff == 2) and Summer_Precip > Total_Precip*0.5)):
-                        if Summer_Length < thirdl:
-                            clim = Cwc
-                        elif Max_Temp > 22:
-                            clim = Cwa
-                        else:
-                            clim = Cwb
-                    else:
-                        if Summer_Length < thirdl:
-                            clim = Cfc
-                        elif Max_Temp > 22:
-                            clim = Cfa
-                        else:
-                            clim = Cfb
-                else:
-                    if (Min_Sum_Precip < 30 or (med_def == 1 and Min_Sum_Precip < 40)) and Min_Win_Precip > Min_Sum_Precip and Max_Win_Precip > Min_Sum_Precip*3 and ((add_def == 1 or add_def == 3) or ((add_def == 0 or add_def == 2) and Summer_Precip < Total_Precip*0.5)) and (prio_def == 0 or (prio_def == 1 and ((wet_def != 1 and Max_Sum_Precip <= Min_Win_Precip*10) or (wet_def == 1 and Summer_Precip <= Total_Precip*0.7)))):
-                        if Summer_Length < thirdl:
-                            if Min_Temp < -38:
-                                clim = Dsd
+                #seasonless zones
+                
+                elif land_type == 3:
+                    if Total_Precip < Avg_Temp*20+140 and (Avg_Temp > 10 or (Avg_Temp > 0 and ice_def != 2) or (ice_def != 1 and ice_def != 2)):
+                        if Total_Precip < Avg_Temp*10+70:
+                            if Avg_Temp > 18 or (arid_def != 1 and Avg_Temp > 0) or (arid_def != 1 and temp_def == 1 and Avg_Temp > -3):
+                                clim = HotDesertnos
                             else:
-                                clim = Dsc
-                        elif Max_Temp > 22:
-                            clim = Dsa
+                                clim = ColdDesertnos
                         else:
-                            clim = Dsb
-                    elif ((wet_def != 1 and Max_Sum_Precip > Min_Win_Precip*10) or (wet_def == 1 and Summer_Precip > Total_Precip*0.7)) and ((add_def == 0 or add_def == 3) or ((add_def == 1 or add_deff == 2) and Summer_Precip > Total_Precip*0.5)):
-                        if Summer_Length < thirdl:
-                            if Min_Temp < -38:
-                                clim = Dwd
+                            if Avg_Temp > 18 or (arid_def != 1 and Avg_Temp > 0) or (arid_def != 1 and temp_def == 1 and Avg_Temp > -3):
+                                clim = HotSteppenos
                             else:
-                                clim = Dwc
-                        elif Max_Temp > 22:
-                            clim = Dwa
+                                clim = ColdSteppenos
+                    elif Avg_Temp < 10:
+                        if Avg_Temp < 0:
+                            clim = IceCapnos
                         else:
-                            clim = Dwb
+                            clim = Tundranos
+                    elif Avg_Temp > 18:
+                        if Total_Precip/12 > 60:
+                            clim = TropRainforestnos
+                        else:
+                            clim = TropSavannanos
                     else:
-                        if Summer_Length < thirdl:
-                            if Min_Temp < -38:
-                                clim = Dfd
+                        clim = Oceanicnos
+                        
+                #Full Koppen set
+                
+                elif land_type < 3:
+                    #determine threshold for arid zones
+                    if Summer_Precip > Total_Precip*0.7:
+                        adjust = 280
+                    elif Summer_Precip > Total_Precip*0.3:
+                        adjust = 140
+                    else:
+                        adjust = 0
+                    Arid_threshold = Avg_Temp*20 + adjust
+                    
+                    #Finds Koppen zone
+                    if Total_Precip < Arid_threshold and (Max_Temp > 10 or (Max_Temp > 0 and ice_def != 2) or (ice_def != 1 and ice_def != 2)):
+                        if Total_Precip < Arid_threshold/2:
+                            if (arid_def != 1 and Min_Temp > 0) or (arid_def == 1 and Avg_Temp > 18) or (arid_def != 1 and temp_def == 1 and Min_Temp > -3):
+                                clim = BWh
                             else:
-                                clim = Dfc
-                        elif Max_Temp > 22:
-                            clim = Dfa
+                                clim = BWk
                         else:
-                            clim = Dfb
-            
-            #Reduced sets; determined from the above rather than having a new routine for every option
-            
-            if land_type == 1:
-                if clim == As:
-                    clim = Aw
-            
-            if land_type == 2:
-                if clim == Af:
-                    clim = TropRainforest
-                elif clim == Am:
-                    clim = TropMonsoon
-                elif clim == As or clim == Aw:
-                    clim = TropSavanna
-                elif clim == BWh:
-                    clim = HotDesert
-                elif clim == BWk:
-                    clim = ColdDesert
-                elif clim == BSh:
-                    clim = HotSteppe
-                elif clim == BSk:
-                    clim = ColdSteppe
-                elif clim == Csa or clim == Csb or clim == Csc:
-                    clim = Med
-                elif clim == Cwa or clim == Cfa:
-                    clim = Subtropical
-                elif clim == Cwb or clim == Cwc or clim == Cfb or clim == Cfc:
-                    clim = Oceanic
-                elif clim == Dsa or clim == Dsb or clim == Dwa or clim == Dwb or clim == Dfa or clim == Dfb:
-                    clim = Continental
-                elif clim == Dsc or clim == Dsd or clim == Dwc or clim == Dwd or clim == Dfc or clim == Dfd:
-                    clim = Subarctic
-                elif clim == ET:
-                    clim = Tundra
-                elif clim == EF:
-                    clim = IceCap
-            
-            #Holdridge Life Zones
-            
-            if land_type == 5:
-                if Avg_Biot > 24:
-                    if Total_Precip > 8000:
-                        clim = HTropRainForest
-                    elif Total_Precip > 4000:
-                        clim = HTropWetForest
-                    elif Total_Precip > 2000:
-                        clim = HTropMoistForest
-                    elif Total_Precip > 1000:
-                        clim = HTropDryForest
-                    elif Total_Precip > 500:
-                        clim = HVDryForest
-                    elif Total_Precip > 250:
-                        clim = HThornWood
-                    elif Total_Precip > 125:
-                        clim = HTropDesertScrub
+                            if (arid_def != 1 and Min_Temp > 0) or (arid_def == 1 and Avg_Temp > 18) or (arid_def != 1 and temp_def == 1 and Min_Temp > -3):
+                                clim = BSh
+                            else:
+                                clim = BSk
+                    elif Max_Temp < 10:
+                        if Max_Temp < 0:
+                            clim = EF
+                        else:
+                            clim = ET
+                    elif Min_Temp > 18:
+                        if Min_Precip > 60:
+                            clim = Af
+                        elif Min_Precip > 100-Total_Precip/25:
+                            clim = Am
+                        else:
+                            if Summer_Precip < Total_Precip/2:
+                                clim = As
+                            else:
+                                clim = Aw
+                    elif Min_Temp > 0 or (temp_def == 1 and Avg_Temp > -3):
+                        if (Min_Sum_Precip < 30 or (med_def == 1 and Min_Sum_Precip < 40)) and Min_Win_Precip > Min_Sum_Precip and Max_Win_Precip > Min_Sum_Precip*3 and ((add_def == 1 or add_def == 3) or ((add_def == 0 or add_def == 2) and Summer_Precip < Total_Precip*0.5)) and (prio_def == 0 or (prio_def == 1 and ((wet_def != 1 and Max_Sum_Precip <= Min_Win_Precip*10) or (wet_def == 1 and Summer_Precip <= Total_Precip*0.7)))):
+                            if Summer_Length < thirdl:
+                                clim = Csc
+                            elif Max_Temp > 22:
+                                clim = Csa
+                            else:
+                                clim = Csb
+                        elif ((wet_def != 1 and Max_Sum_Precip > Min_Win_Precip*10) or (wet_def == 1 and Summer_Precip > Total_Precip*0.7)) and ((add_def == 0 or add_def == 3) or ((add_def == 1 or add_deff == 2) and Summer_Precip > Total_Precip*0.5)):
+                            if Summer_Length < thirdl:
+                                clim = Cwc
+                            elif Max_Temp > 22:
+                                clim = Cwa
+                            else:
+                                clim = Cwb
+                        else:
+                            if Summer_Length < thirdl:
+                                clim = Cfc
+                            elif Max_Temp > 22:
+                                clim = Cfa
+                            else:
+                                clim = Cfb
                     else:
-                        clim = HTropDesert
-                elif Avg_Biot > 12:
-                    if Total_Precip > 4000:
-                        clim = HWarmRainForest
-                    elif Total_Precip > 2000:
-                        clim = HWarmWetForest
-                    elif Total_Precip > 1000:
-                        clim = HWarmMoistForest
-                    elif Total_Precip > 500:
-                        clim = HWarmDryForest
-                    elif Total_Precip > 250:
-                        clim = HThornSteppe
-                    elif Total_Precip > 125:
-                        clim = HWarmDesertScrub
+                        if (Min_Sum_Precip < 30 or (med_def == 1 and Min_Sum_Precip < 40)) and Min_Win_Precip > Min_Sum_Precip and Max_Win_Precip > Min_Sum_Precip*3 and ((add_def == 1 or add_def == 3) or ((add_def == 0 or add_def == 2) and Summer_Precip < Total_Precip*0.5)) and (prio_def == 0 or (prio_def == 1 and ((wet_def != 1 and Max_Sum_Precip <= Min_Win_Precip*10) or (wet_def == 1 and Summer_Precip <= Total_Precip*0.7)))):
+                            if Summer_Length < thirdl:
+                                if Min_Temp < -38:
+                                    clim = Dsd
+                                else:
+                                    clim = Dsc
+                            elif Max_Temp > 22:
+                                clim = Dsa
+                            else:
+                                clim = Dsb
+                        elif ((wet_def != 1 and Max_Sum_Precip > Min_Win_Precip*10) or (wet_def == 1 and Summer_Precip > Total_Precip*0.7)) and ((add_def == 0 or add_def == 3) or ((add_def == 1 or add_deff == 2) and Summer_Precip > Total_Precip*0.5)):
+                            if Summer_Length < thirdl:
+                                if Min_Temp < -38:
+                                    clim = Dwd
+                                else:
+                                    clim = Dwc
+                            elif Max_Temp > 22:
+                                clim = Dwa
+                            else:
+                                clim = Dwb
+                        else:
+                            if Summer_Length < thirdl:
+                                if Min_Temp < -38:
+                                    clim = Dfd
+                                else:
+                                    clim = Dfc
+                            elif Max_Temp > 22:
+                                clim = Dfa
+                            else:
+                                clim = Dfb
+                
+                #Reduced sets; determined from the above rather than having a new routine for every option
+                
+                if land_type == 1:
+                    if clim == As:
+                        clim = Aw
+                
+                if land_type == 2:
+                    if clim == Af:
+                        clim = TropRainforest
+                    elif clim == Am:
+                        clim = TropMonsoon
+                    elif clim == As or clim == Aw:
+                        clim = TropSavanna
+                    elif clim == BWh:
+                        clim = HotDesert
+                    elif clim == BWk:
+                        clim = ColdDesert
+                    elif clim == BSh:
+                        clim = HotSteppe
+                    elif clim == BSk:
+                        clim = ColdSteppe
+                    elif clim == Csa or clim == Csb or clim == Csc:
+                        clim = Med
+                    elif clim == Cwa or clim == Cfa:
+                        clim = Subtropical
+                    elif clim == Cwb or clim == Cwc or clim == Cfb or clim == Cfc:
+                        clim = Oceanic
+                    elif clim == Dsa or clim == Dsb or clim == Dwa or clim == Dwb or clim == Dfa or clim == Dfb:
+                        clim = Continental
+                    elif clim == Dsc or clim == Dsd or clim == Dwc or clim == Dwd or clim == Dfc or clim == Dfd:
+                        clim = Subarctic
+                    elif clim == ET:
+                        clim = Tundra
+                    elif clim == EF:
+                        clim = IceCap
+                
+                #Holdridge Life Zones
+                
+                if land_type == 5:
+                    if Avg_Biot > 24:
+                        if Total_Precip > 8000:
+                            clim = HTropRainForest
+                        elif Total_Precip > 4000:
+                            clim = HTropWetForest
+                        elif Total_Precip > 2000:
+                            clim = HTropMoistForest
+                        elif Total_Precip > 1000:
+                            clim = HTropDryForest
+                        elif Total_Precip > 500:
+                            clim = HVDryForest
+                        elif Total_Precip > 250:
+                            clim = HThornWood
+                        elif Total_Precip > 125:
+                            clim = HTropDesertScrub
+                        else:
+                            clim = HTropDesert
+                    elif Avg_Biot > 12:
+                        if Total_Precip > 4000:
+                            clim = HWarmRainForest
+                        elif Total_Precip > 2000:
+                            clim = HWarmWetForest
+                        elif Total_Precip > 1000:
+                            clim = HWarmMoistForest
+                        elif Total_Precip > 500:
+                            clim = HWarmDryForest
+                        elif Total_Precip > 250:
+                            clim = HThornSteppe
+                        elif Total_Precip > 125:
+                            clim = HWarmDesertScrub
+                        else:
+                            clim = HWarmDesert
+                    elif Avg_Biot > 6:
+                        if Total_Precip > 2000:
+                            clim = HCoolRainForest
+                        elif Total_Precip > 1000:
+                            clim = HCoolWetForest
+                        elif Total_Precip > 500:
+                            clim = HCoolMoistForest
+                        elif Total_Precip > 250:
+                            clim = HSteppe
+                        elif Total_Precip > 125:
+                            clim = HCoolDesertScrub
+                        else:
+                            clim = HCoolDesert
+                    elif Avg_Biot > 3:
+                        if Total_Precip > 1000:
+                            clim = HBorRainForest
+                        elif Total_Precip > 500:
+                            clim = HBorWetForest
+                        elif Total_Precip > 250:
+                            clim = HBorMoistForest
+                        elif Total_Precip > 125:
+                            clim = HDryScrub
+                        else:
+                            clim = HBorDesert
+                    elif Avg_Biot > 1.5:
+                        if Total_Precip > 500:
+                            clim = HRainTundra
+                        elif Total_Precip > 250:
+                            clim = HWetTundra
+                        elif Total_Precip > 125:
+                            clim = HMoistTundra
+                        else:
+                            clim = HDryTundra
                     else:
-                        clim = HWarmDesert
-                elif Avg_Biot > 6:
-                    if Total_Precip > 2000:
-                        clim = HCoolRainForest
-                    elif Total_Precip > 1000:
-                        clim = HCoolWetForest
-                    elif Total_Precip > 500:
-                        clim = HCoolMoistForest
-                    elif Total_Precip > 250:
-                        clim = HSteppe
-                    elif Total_Precip > 125:
-                        clim = HCoolDesertScrub
-                    else:
-                        clim = HCoolDesert
-                elif Avg_Biot > 3:
-                    if Total_Precip > 1000:
-                        clim = HBorRainForest
-                    elif Total_Precip > 500:
-                        clim = HBorWetForest
-                    elif Total_Precip > 250:
-                        clim = HBorMoistForest
-                    elif Total_Precip > 125:
-                        clim = HDryScrub
-                    else:
-                        clim = HBorDesert
-                elif Avg_Biot > 1.5:
-                    if Total_Precip > 500:
-                        clim = HRainTundra
-                    elif Total_Precip > 250:
-                        clim = HWetTundra
-                    elif Total_Precip > 125:
-                        clim = HMoistTundra
-                    else:
-                        clim = HDryTundra
-                else:
-                    clim = HPolDesert
+                        clim = HPolDesert
+                
+                #Write to array
+                Koppen_Full[x,y] = clim
             
             #sea zones
+            if blend == 1 or lsm[0,y,x] < 0.5:
             
-            #no seas
-            
-            if sea_type == 5:
-                pass
-            
-            #flat seas
-            
-            elif sea_type == 4:
-                seaclim = SeaFlat
-            
-            #seasonless seas
-            
-            elif sea_type == 2 or sea_type == 3:
-                if Avg_Seatemp > 18:
-                    seaclim = SeaTropnos
-                elif (sea_def != 1 and Avg_Ice > 0.5) or (sea_def == 1 and Avg_Seatemp < -2):
-                        seaclim = SeaPermIcenos
+                #no seas
+                
+                if sea_type == 5:
+                    pass
                 else:
-                    seaclim = SeaTempnos
-            
-            #seasonal seas
-            
-            else:
-                if Min_Seatemp > 18:
-                    seaclim = SeaTrop
-                elif (sea_def != 1 and Min_Ice > 0.8) or (sea_def == 1 and Max_Seatemp < -2):
-                    seaclim = SeaPermIce
-                elif (sea_def != 1 and Max_Ice > 0.2) or (sea_def == 1 and Min_Seatemp < -2):
-                    seaclim = SeaSeasonalIce
-                else:
-                    seaclim = SeaTemp
-            
-            #reduced sets
-            
-            if sea_type == 1:
-                if seaclim == SeaTrop:
-                    seaclim = SeaTemp
-            
-            if sea_type == 3:
-                if seaclim == SeaTropnos:
-                    seaclim = SeaTempnos
-            
-            #write climate types to arrays
-            Koppen_Full[x,y] = clim
-            if sea_type != 5:
-                Sea_Zones[x,y] = seaclim
+                    
+                    #flat seas
+                    
+                    if sea_type == 4:
+                        seaclim = SeaFlat
+                    
+                    #seasonless seas
+                    
+                    elif sea_type == 2 or sea_type == 3:
+                        if Avg_Seatemp > 18:
+                            seaclim = SeaTropnos
+                        elif (sea_def != 1 and Avg_Ice > 0.5) or (sea_def == 1 and Avg_Seatemp < -2):
+                                seaclim = SeaPermIcenos
+                        else:
+                            seaclim = SeaTempnos
+                    
+                    #seasonal seas
+                    
+                    else:
+                        if Min_Seatemp > 18:
+                            seaclim = SeaTrop
+                        elif (sea_def != 1 and Min_Ice > 0.8) or (sea_def == 1 and Max_Seatemp < -2):
+                            seaclim = SeaPermIce
+                        elif (sea_def != 1 and Max_Ice > 0.2) or (sea_def == 1 and Min_Seatemp < -2):
+                            seaclim = SeaSeasonalIce
+                        else:
+                            seaclim = SeaTemp
+                    
+                    #reduced sets
+                    
+                    if sea_type == 1:
+                        if seaclim == SeaTrop:
+                            seaclim = SeaTemp
+                    
+                    if sea_type == 3:
+                        if seaclim == SeaTropnos:
+                            seaclim = SeaTempnos
+                    
+                    #Write to array
+                    Sea_Zones[x,y] = seaclim
 
 
     #Applies the coloring function to our climate zone arrays and draws images from them
@@ -1619,8 +1615,36 @@ Add additional inputs? (y/n): ''')
                     print('No file found at '+str(nextin))
             print('All files found')
 
-    #Main loop, so we can use the same files for multiple outputs:
+    #Establish all inputs with default values first
+    output_name="output"
+    cfg_loadname=""
+    land_type=0
+    sea_type=0
+    blend=0
+    color_type=0
+    col_list_path="none"
+    bin_num=1
+    interp=0
+    dum_ice=0
+    use_topo=0
+    topo_path="none"
+    maxel=0
+    minel=0
+    gravity=0
+    blend_topo=0
+    sealev=0
+    sum_def=0
+    temp_def=0
+    arid_def=0
+    med_def=0
+    wet_def=0
+    add_def=0
+    prio_def=0
+    ice_def=0
+    sea_def=0
 
+    #Main loop, so we can use the same files for multiple outputs:
+    
     while True:
         if res == 1:
             cfg_op = input('''
@@ -1665,6 +1689,8 @@ Set Color List: '''))
                 maxel = adv.getfloat('Max Elevation')
                 minel = adv.getfloat('Min Elevation')
                 gravity = adv.getfloat('Surface Gravity')
+                blend_topo = adv.getint('Blend by Topography Map')
+                sealev = adv.getfloat('Sea Level')
                 if use_topo == 1:
                     if topo_path == 'prompt':
                         topo_map = input('New Topography Map for temperature adjustmet (input "0" to not use topography): ')
@@ -1691,6 +1717,7 @@ Set Color List: '''))
                         maxel = float(input('Highest Map Elevation (m): '))
                         minel = float(input('Lowest Map Elevation (m): '))
                         gravity = float(input('Surface Gravity (m/s^2): '))
+                        sealev = float(input('Sea Level (m): '))
                 defs = cfg['Climate Zone Definitions']
                 sum_def = defs.getint('Summer Definition')
                 temp_def = defs.getint('Temperate/Continental Boundary')
@@ -1704,8 +1731,6 @@ Set Color List: '''))
                 print('Config parameters loaded')
         #If a config is loaded, the rest of configuration is skipped. Otherwise:
             else:
-                cfg_op = 0
-                cfg_loadname = ""
                 land_type = int(input('''
 Land Climate Zones
 0: Full Koppen set of 31 climate zones (default)
@@ -1733,8 +1758,6 @@ Color List
 2: "True" color; fills each zone with their average color on Earth, based on satellite imagery (all sea zones except permanent ice given same color)
 3: Import custom color list (see defaultcolor.ini for template)
 Set Color List: '''))
-                else:
-                    color_type = 0
                 if color_type == 3:
                     while True:
                         col_list = input('Custom Color List filename: ')
@@ -1744,8 +1767,6 @@ Set Color List: '''))
                         else:
                             print('No file found at '+str(col_list_path))
                     print('Custom Color List found')
-                else:
-                    col_list_path = 'none'
                 blend = int(input('''
 Land/Sea Blend
 0: Use land/sea mask in the NetCDF file to blend land and sea climates into a single map:
@@ -1797,21 +1818,6 @@ Upload Topography? (y/n): ''')
                         use_topo = 1
                     else:
                         use_topo = 0
-                else:
-                    dum_ice = 0
-                    use_topo = 0
-        else:
-            cfg_loadname = ""
-            land_type = 0
-            sea_type = 0
-            color_type = 0
-            col_list_path = 'none'
-            blend = 0
-            bin_num = 1
-            interp = 0
-            dum_ice = 0
-            use_topo = 0
-            output_name = 'output'
 
 
         if use_topo == 1:
@@ -1823,7 +1829,7 @@ Upload Topography? (y/n): ''')
                 maph = len(lat) * interp
                 mapw = maph * 2
                 print('''Input Topography Map
-CAUTION: Must be greyscale (white high, black low) and seas should be marked as 0 elevation
+CAUTION: Must be greyscale (white high, black low) and seas should be marked as flat surfaces
 Interpolated map resolution:''')
                 print(str(maph) + 'x' + str(mapw))
                 while True:
@@ -1836,12 +1842,17 @@ Interpolated map resolution:''')
                 print('Topography Map found')
                 maxel = float(input('Highest Map Elevation (m): '))
                 minel = float(input('Lowest Map Elevation (m): '))
+                sealev = float(input('Sea Level (m): '))
                 gravity = float(input('Surface Gravity (m/s^2): '))
-        else:
-            topo_path = "none"
-            maxel = 0
-            minel = 0
-            gravity = 0
+                if blend != 1:
+                    blend_topo = input('''Blend by Topography Map
+Blends Land and Sea Maps at Interpolated Resolution using Topography Map
+    with specified sea level
+Blend by Map? (y/n): ''')
+                    if blend_topo in ('y') or blend_topo in ('1'):
+                        blend_topo = 1
+                    else:
+                        blend_topo = 0
 
         if res == 1:
             if cfg_op == 1:
@@ -1900,11 +1911,6 @@ Mediterranean / Wet-Summer Priority
 0: Where a region meets the requirements for both, it will be marked as Med (Cs, Ds) rather than Wet-summer (Cw, Dw) (default)
 1: Where a region meets the requirements for both, it will be marked as Wet-summer (Cw, Dw) rather than Med (Cs, Ds)
 Set Definition: '''))
-                    else:
-                        med_def = 0
-                        wet_def = 0
-                        add_def = 0
-                        prio_def = 0
                     ice_def = int(input('''
 Arid/Polar Priority
 0: All zones meeting arid definition are classed as arid (B), even if [maximum temperature < 0 C] (default)
@@ -1919,18 +1925,6 @@ Sea Ice Definition
 1: Permanent sea ice zone where [maximum temperature < -2 C], seasonal where [minimum temperature < -2 C]
     (my initial definition, before I had access to sea ice modelling)
 Set Definition: '''))
-                    else:
-                        sea_def = 0
-                else:   #where definitions are not input, set all to default
-                    sum_def = 0
-                    temp_def = 0
-                    arid_def = 0
-                    med_def = 0
-                    wet_def = 0
-                    add_def = 0
-                    prio_def = 0
-                    ice_def = 0
-                    sea_def = 0
                 cfg_save_op = input('''
 Config
 Saves the above configurations and definitions to a .ini file that can be loaded in later uses of this script to save time.
@@ -1964,7 +1958,9 @@ Prompt for Topography Map? (y/n): ''')
                                                     'Topography Map': str(topo_save),
                                                     'Max Elevation': str(maxel),
                                                     'Min Elevation': str(minel),
-                                                    'Surface Gravity': str(gravity)}
+                                                    'Surface Gravity': str(gravity),
+                                                    'Blend by Topography Map': str(blend_topo),
+                                                    'Sea Level': str(sealev)}
                     config['Climate Zone Definitions'] = {'Summer Definition': str(sum_def),
                                                         'Temperate/Continental Boundary': str(temp_def),
                                                         'Hot/Cold Arid Boundary': str(arid_def),
@@ -1982,19 +1978,9 @@ Prompt for Topography Map? (y/n): ''')
 Output map name: ''')
             print('''Setup Complete
 ''')
-        else:
-            sum_def = 0
-            temp_def = 0
-            arid_def = 0
-            med_def = 0
-            wet_def = 0
-            add_def = 0
-            prio_def = 0
-            ice_def = 0
-            sea_def = 0
 
         MakeMap(in_files, output_name, cfg_loadname, land_type, sea_type, blend, color_type, col_list_path,
-                bin_num, interp, dum_ice, use_topo, topo_path, maxel, minel, gravity, sum_def, temp_def,
+                bin_num, interp, dum_ice, use_topo, topo_path, maxel, minel, gravity, blend_topo, sealev, sum_def, temp_def,
                 arid_def, med_def, wet_def, add_def, prio_def, ice_def, sea_def)
         redo = input("""
 Produce another map with same inputs? (y/n): """)
