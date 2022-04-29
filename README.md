@@ -45,6 +45,10 @@ koppenpasta.py
   
   gravity: Surface gravity for use with topography map (m/s^2)
   
+  blend_topo: Blend by Topography Map (1/0)
+  
+  sealev: Sea Level (m)
+  
   sum_def: Summer Definition (0-1)
   
   temp_def: Temperate/Continental Boundary (0-1)
