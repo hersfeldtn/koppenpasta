@@ -418,11 +418,11 @@ def color(inarray, outlist, latl, lonl, lsm, blend, land_type, sea_type, color_t
                 elif clim == ET or clim == Tundra or clim == Tundranos:
                     rgb = (122,119,92)
                 elif clim == EF or clim == IceCap or clim == IceCapnos or clim == E:
-                    rgb = (162,183,208)
+                    rgb = (204,217,232)
                 elif clim == SeaTrop or clim == SeaTropnos or clim == SeaTemp or clim == SeaTempnos or clim == SeaFlat or clim == SeaSeasonalIce:
                     rgb = (20,30,66)
                 elif clim == SeaPermIce or clim == SeaPermIcenos:
-                    rgb = (169,185,202)
+                    rgb = (190,208,226)
                 else:
                     rgb = (0,0,0)   #if no recognized climate zone is attached to this position, mark it black for debug purposes
                     
