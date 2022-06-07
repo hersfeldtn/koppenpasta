@@ -691,7 +691,7 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
         maxel = adv.getfloat('Max Elevation')
         minel = adv.getfloat('Min Elevation')
         gravity = adv.getfloat('Surface Gravity')
-        blend_topo = adv.geting('Blend by Topography Map')
+        blend_topo = adv.getint('Blend by Topography Map')
         sealev = adv.getfloat('Sea Level')
         defs = cfg['Climate Zone Definitions']
         sum_def = defs.getint('Summer Definition')
