@@ -1934,6 +1934,7 @@ Note that:
     The config file can only be altered later by manually opening and editting the .ini file
 Save configuration to config file? (y/n): ''')
                 if cfg_save_op in ('y') or cfg_save_op in ('1'):
+                    topo_save = topo_path
                     if use_topo == 1:
                         topo_prompt = input('''
 Topography Map Prompt
@@ -1942,8 +1943,6 @@ Otherwise, the same topography will be used in the future (unless it can't be fo
 Prompt for Topography Map? (y/n): ''')
                         if topo_prompt in ('y') or topo_prompt in ('1'):
                             topo_save = 'prompt'
-                        else:
-                            topo_save = topo_path
                     cfg_savename = str(input('Config name: '))
                     config = configparser.ConfigParser()
                     config['Zone Types'] = {'Land Climate Zones': str(land_type),
