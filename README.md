@@ -90,5 +90,7 @@ eps_avg.py
   offset: Month Offset (0 for none)
   
   rotate: Rotate Longitudes (1/0)
+  
+  convert: Convert precipitation units (0-4)
 
 See the full tutorial for their use at https://worldbuildingpasta.blogspot.com/2021/11/an-apple-pie-from-scratch-part-vi.html
