@@ -133,7 +133,7 @@ img_rgb = []
 #converts 0-1 to elevation
 if oceans == 1:
 	greyscale_img = grey_img*255 #converts 0-1 to 0-255
-	max_img = 255-(floor_value) #max value lowered by floor value
+	max_img = np.amax(greyscale_img)-(floor_value) #max value lowered by floor value
 	rescaled_img = (greyscale_img-(floor_value)) #array lowered by floor value
 	rescaled_img[rescaled_img <= 0] = 0 #any negative value becomes 0 (ocean)
 	rescaled_img = (rescaled_img/max_img)*peak_value*gravity #array converted to 0-1, before multiplied by max height and gravity (geopotential)
@@ -141,15 +141,17 @@ if oceans == 1:
 	max = float(np.max(rescaled_img)) #finds the max height (should be near absolute max height)
 	color_ocean(rescaled_img, img_rgb, img_width, img_height)
 if oceans == 0:
-	rescaled_img = ((grey_img*range_value)-trench_value)*gravity #converts 0-1 to trench-peak times gravity (geopotential)
-	min = float(np.min(rescaled_img)) #finds the min height (should be near deepest depth)
-	max = float(np.max(rescaled_img)) #finds the max height (should be near absolute max height)
-	color_land(rescaled_img, img_rgb, img_width, img_height)
+        grey_img = grey_img - np.amin(grey_img)
+        grey_img = grey_img / np.amax(grey_img)
+        rescaled_img = ((grey_img*range_value)-trench_value)*gravity #converts 0-1 to trench-peak times gravity (geopotential)
+        min = float(np.min(rescaled_img)) #finds the min height (should be near deepest depth)
+        max = float(np.max(rescaled_img)) #finds the max height (should be near absolute max height)
+        color_land(rescaled_img, img_rgb, img_width, img_height)
 
 if debug_img == 1:
 	img = Image.new('RGB',(img_height,img_width)) #print original image
 	img.putdata(img_rgb)
-	img = img.transpose(Image.ROTATE_90)
+	img = img.transpose(Image.Transpose.ROTATE_90)
 	img = ImageOps.flip(img)
 	img.save(path+"LandMaskOriginal.png")
 
@@ -215,7 +217,7 @@ if oceans == 0:
 if debug_img == 1:
 	img = Image.new('RGB',(height,width)) #print resized image
 	img.putdata(img_rgb)
-	img = img.transpose(Image.ROTATE_90)
+	img = img.transpose(Image.Transpose.ROTATE_90)
 	img = ImageOps.flip(img)
 	img.save(path+"LandMaskSmall.png")
 
