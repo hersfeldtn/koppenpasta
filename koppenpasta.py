@@ -1600,7 +1600,7 @@ Set Sea Climate Type: '''))
                 if land_type == 5:
                     color_type = int(input('''
 Color List
-0: Default; based on the key on Wikipedia's Holdridge Life Zones page, Artifexian, etc.
+0: Default; based on the key on Wikipedia's Holdridge Life Zones page.
 1: Import custom color list (see defaultcolor.ini for template)
 Set Color List: '''))
                     if color_type > 0:
