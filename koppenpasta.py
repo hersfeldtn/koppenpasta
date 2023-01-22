@@ -117,9 +117,10 @@ HTropRainForest=98
 
 Sea_Zones=1
 
-#defines a function to convert climate zone array to a list of rgb values
-#there may be a better way to do this with dictionaries, but this works for now
-def color(inarray, outlist, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path, inarraysea=Sea_Zones):
+#Create list of colors corresponding to each climate type, depending on the color list
+def make_colmap(color_type, col_list_path):
+    colmap = np.empty((255,3),dtype=np.uint8)
+    colmap[0] = [0,0,0] #if no recognized climate zone is attached to this position, mark it black for debug purposes
     if color_type == 3:
         #Reads custom color list file
         cfg = configparser.ConfigParser()
@@ -132,505 +133,358 @@ def color(inarray, outlist, latl, lonl, lsm, blend, land_type, sea_type, color_t
         redsea = cfg['Reduced Sea']
         hold = cfg['Holdridge']
         nozon = cfg['Debug']
+        colist = np.empty((255),dtype=str)
+        colist[0] = nozon.get('None')
+        colist[Af] = fulkop.get('Af')
+        colist[Am] = fulkop.get('Am')
+        colist[Aw] = fulkop.get('Aw')
+        colist[As] = fulkop.get('As')
+        colist[BWh] = fulkop.get('BWh')
+        colist[BWk] = fulkop.get('BWk')
+        colist[BSh] = fulkop.get('BSh')
+        colist[BSk] = fulkop.get('BSk')
+        colist[Csa] = fulkop.get('Csa')
+        colist[Csb] = fulkop.get('Csb')
+        colist[Csc] = fulkop.get('Csc')
+        colist[Cwa] = fulkop.get('Cwa')
+        colist[Cwb] = fulkop.get('Cwb')
+        colist[Cwc] = fulkop.get('Cwc')
+        colist[Cfa] = fulkop.get('Cfa')
+        colist[Cfb] = fulkop.get('Cfb')
+        colist[Cfc] = fulkop.get('Cfc')
+        colist[Dsa] = fulkop.get('Dsa')
+        colist[Dsb] = fulkop.get('Dsb')
+        colist[Dsc] = fulkop.get('Dsc')
+        colist[Dsd] = fulkop.get('Dsd')
+        colist[Dwa] = fulkop.get('Dwa')
+        colist[Dwb] = fulkop.get('Dwb')
+        colist[Dwc] = fulkop.get('Dwc')
+        colist[Dwd] = fulkop.get('Dwd')
+        colist[Dfa] = fulkop.get('Dfa')
+        colist[Dfb] = fulkop.get('Dfb')
+        colist[Dfc] = fulkop.get('Dfc')
+        colist[Dfd] = fulkop.get('Dfd')
+        colist[ET] = fulkop.get('ET')
+        colist[EF] = fulkop.get('EF')
+        colist[A] = kopgroup.get('A')
+        colist[B] = kopgroup.get('B')
+        colist[C] = kopgroup.get('C')
+        colist[D] = kopgroup.get('D')
+        colist[E] = kopgroup.get('E')
+        colist[TropRainforest] = redkop.get('TropRainforest')
+        colist[TropMonsoon] = redkop.get('TropMonsoon')
+        colist[TropSavanna] = redkop.get('TropSavanna')
+        colist[HotDesert] = redkop.get('HotDesert')
+        colist[HotSteppe] = redkop.get('HotSteppe')
+        colist[ColdDesert] = redkop.get('ColdDesert')
+        colist[ColdSteppe] = redkop.get('ColdSteppe')
+        colist[Med] = redkop.get('Med')
+        colist[Subtropical] = redkop.get('Subtropical')
+        colist[Oceanic] = redkop.get('Oceanic')
+        colist[Continental] = redkop.get('Continental')
+        colist[Subarctic] = redkop.get('Subarctic')
+        colist[Tundra] = redkop.get('Tundra')
+        colist[IceCap] = redkop.get('IceCap')
+        colist[TropRainforestnos] = noskop.get('TropRainforestnos')
+        colist[TropSavannanos] = noskop.get('TropSavannanos')
+        colist[HotDesertnos] = noskop.get('HotDesertnos')
+        colist[HotSteppenos] = noskop.get('HotSteppenos')
+        colist[ColdDesertnos] = noskop.get('ColdDesertnos')
+        colist[ColdSteppenos] = noskop.get('ColdSteppenos')
+        colist[Oceanicnos] = noskop.get('Oceanicnos')
+        colist[Tundranos] = noskop.get('Tundranos')
+        colist[IceCapnos] = noskop.get('IceCapnos')
+        colist[SeaTrop] = seazon.get('SeaTrop')
+        colist[SeaTemp] = seazon.get('SeaTemp')
+        colist[SeaSeasonalIce] = seazon.get('SeaSeasonalIce')
+        colist[SeaPermIce] = seazon.get('SeaPermIce')
+        colist[SeaTropnos] = redsea.get('SeaTropnos')
+        colist[SeaTempnos] = redsea.get('SeaTempnos')
+        colist[SeaPermIcenos] = redsea.get('SeaPermIcenos')
+        colist[SeaFlat] = redsea.get('SeaFlat')
+        colist[HPolDesert] = hold.get('HPolDesert')
+        colist[HDryTundra] = hold.get('HDryTundra')
+        colist[HMoistTundra] = hold.get('HMoistTundra')
+        colist[HWetTundra] = hold.get('HWetTundra')
+        colist[HRainTundra] = hold.get('HRainTundra')
+        colist[HBorDesert] = hold.get('HBorDesert')
+        colist[HDryScrub] = hold.get('HDryScrub')
+        colist[HBorMoistForest] = hold.get('HBorMoistForest')
+        colist[HBorWetForest] = hold.get('HBorWetForest')
+        colist[HBorRainForest] = hold.get('HBorRainForest')
+        colist[HCoolDesert] = hold.get('HCoolDesert')
+        colist[HCoolDesertScrub] = hold.get('HCoolDesertScrub')
+        colist[HSteppe] = hold.get('HSteppe')
+        colist[HCoolMoistForest] = hold.get('HCoolMoistForest')
+        colist[HCoolWetForest] = hold.get('HCoolWetForest')
+        colist[HCoolRainForest] = hold.get('HCoolRainForest')
+        colist[HWarmDesert] = hold.get('HWarmDesert')
+        colist[HWarmDesertScrub] = hold.get('HWarmDesertScrub')
+        colist[HThornSteppe] = hold.get('HThornSteppe')
+        colist[HWarmDryForest] = hold.get('HWarmDryForest')
+        colist[HWarmMoistForest] = hold.get('HWarmMoistForest')
+        colist[HWarmWetForest] = hold.get('HWarmWetForest')
+        colist[HWarmRainForest] = hold.get('HWarmRainForest')
+        colist[HTropDesert] = hold.get('HTropDesert')
+        colist[HTropDesertScrub] = hold.get('HTropDesertScrub')
+        colist[HThornWood] = hold.get('HThornWood')
+        colist[HVDryForest] = hold.get('HVDryForest')
+        colist[HTropDryForest] = hold.get('HTropDryForest')
+        colist[HTropMoistForest] = hold.get('HTropMoistForest')
+        colist[HTropWetForest] = hold.get('HTropWetForest')
+        colist[HTropRainForest] = hold.get('HTropRainForest')
+        for i in range(len(colist)):
+            co = colist[i]
+            if ',' in co:
+                co = co.split(',')
+                co = [int(j) for j in co]
+                co = tuple(co)
+                colmap[i] = np.asarray[co]
+    else:
+        colmap[HPolDesert] = [255,255,255]
+        colmap[HDryTundra] = [128,128,128]
+        colmap[HMoistTundra] = [96,128,128]
+        colmap[HWetTundra] = [64,128,144]
+        colmap[HRainTundra] = [32,128,192]
+        colmap[HBorDesert] = [160,160,128]
+        colmap[HDryScrub] = [128,160,128]
+        colmap[HBorMoistForest] = [96,160,128]
+        colmap[HBorWetForest] = [64,160,144]
+        colmap[HBorRainForest] = [32,160,192]
+        colmap[HCoolDesert] = [192,192,128]
+        colmap[HCoolDesertScrub] = [160,192,128]
+        colmap[HSteppe] = [128,192,128]
+        colmap[HCoolMoistForest] = [96,192,128]
+        colmap[HCoolWetForest] = [64,192,144]
+        colmap[HCoolRainForest] = [32,192,192]
+        colmap[HWarmDesert] = [224,224,128]
+        colmap[HWarmDesertScrub] = [192,224,128]
+        colmap[HThornSteppe] = [160,224,128]
+        colmap[HWarmDryForest] = [128,224,128]
+        colmap[HWarmMoistForest] = [96,224,128]
+        colmap[HWarmWetForest] = [64,224,144]
+        colmap[HWarmRainForest] = [32,224,192]
+        colmap[HTropDesert] = [255,255,128]
+        colmap[HTropDesertScrub] = [224,255,128]
+        colmap[HThornWood] = [192,255,128]
+        colmap[HVDryForest] = [160,255,128]
+        colmap[HTropDryForest] = [128,255,128]
+        colmap[HTropMoistForest] = [96,255,128]
+        colmap[HTropWetForest] = [64,255,144]
+        colmap[HTropRainForest] = [32,255,160]
+        colmap[SeaTrop] = [9,120,171]
+        colmap[SeaTropnos] = [9,120,171]
+        colmap[SeaTemp] = [113,171,216]
+        colmap[SeaTempnos] = [113,171,216]
+        colmap[SeaFlat] = [113,171,216]
+        colmap[SeaSeasonalIce] = [185,227,255]
+        colmap[SeaPermIce] = [226,248,255]
+        colmap[SeaPermIcenos] = [226,248,255]
+        if color_type == 0:
+            colmap[Af] = [0,0,254]
+            colmap[TropRainforest] = [0,0,254]
+            colmap[TropRainforestnos] = [0,0,254]
+            colmap[A] = [0,0,254]
+            colmap[Am] = [0,119,255]
+            colmap[TropMonsoon] = [0,119,255]
+            colmap[Aw] = [70,169,250]
+            colmap[TropSavanna] = [70,169,250]
+            colmap[TropSavannanos] = [70,169,250]
+            colmap[As] = [127,201,255]
+            colmap[BWh] = [254,0,0]
+            colmap[HotDesert] = [254,0,0]
+            colmap[HotDesertnos] = [254,0,0]
+            colmap[B] = [254,0,0]
+            colmap[BWk] = [254,150,149]
+            colmap[ColdDesert] = [254,150,149]
+            colmap[ColdDesertnos] = [254,150,149]
+            colmap[BSh] = [245,163,1]
+            colmap[HotSteppe] = [245,163,1]
+            colmap[HotSteppenos] = [245,163,1]
+            colmap[BSk] = [255,219,99]
+            colmap[ColdSteppe] = [255,219,99]
+            colmap[ColdSteppenos] = [255,219,99]
+            colmap[Csa] = [255,255,0]
+            colmap[Med] = [255,255,0]
+            colmap[Csb] = [198,199,0]
+            colmap[Csc] = [150,150,0]
+            colmap[Cwa] = [150,255,150]
+            colmap[Subtropical] = [150,255,150]
+            colmap[Cwb] = [99,199,100]
+            colmap[Cwc] = [50,150,51]
+            colmap[Cfa] = [198,255,78]
+            colmap[Cfb] = [102,255,51]
+            colmap[Cfc] = [51,199,1]
+            colmap[Oceanic] = [51,199,1]
+            colmap[Oceanicnos] = [51,199,1]
+            colmap[C] = [51,199,1]
+            colmap[Dsa] = [255,0,254]
+            colmap[Dsb] = [198,0,199]
+            colmap[Dsc] = [150,50,149]
+            colmap[Dsd] = [150,100,149]
+            colmap[Dwa] = [171,177,255]
+            colmap[Dwb] = [90,119,219]
+            colmap[Dwc] = [76,81,181]
+            colmap[Dwd] = [50,0,135]
+            colmap[Dfa] = [0,255,255]
+            colmap[Continental] = [0,255,255]
+            colmap[D] = [0,255,255]
+            colmap[Dfb] = [56,199,255]
+            colmap[Dfc] = [0,126,125]
+            colmap[Subarctic] = [0,126,125]
+            colmap[Dfd] = [0,69,94]
+            colmap[ET] = [178,178,178]
+            colmap[Tundra] = [178,178,178]
+            colmap[Tundranos] = [178,178,178]
+            colmap[EF] = [104,104,104]
+            colmap[IceCap] = [104,104,104]
+            colmap[IceCapnos] = [104,104,104]
+            colmap[E] = [104,104,104] 
+        elif color_type == 1:
+            colmap[Af] = [147,1,1]
+            colmap[TropRainforest] = [147,1,1]
+            colmap[TropRainforestnos] = [147,1,1]
+            colmap[A] = [147,1,1]
+            colmap[Am] = [254,0,0]
+            colmap[TropMonsoon] = [254,0,0]
+            colmap[Aw] = [255,207,207]
+            colmap[TropSavanna] = [255,207,207]
+            colmap[TropSavannanos] = [255,207,207]
+            colmap[As] = [254,154,154]
+            colmap[BWh] = [255,207,0]
+            colmap[HotDesert] = [255,207,0]
+            colmap[HotDesertnos] = [255,207,0]
+            colmap[B] = [255,207,0]
+            colmap[BWk] = [255,254,101]
+            colmap[ColdDesert] = [255,254,101]
+            colmap[ColdDesertnos] = [255,254,101]
+            colmap[BSh] = [207,143,20]
+            colmap[HotSteppe] = [207,143,20]
+            colmap[HotSteppenos] = [207,143,20]
+            colmap[BSk] = [206,170,84]
+            colmap[ColdSteppe] = [206,170,84]
+            colmap[ColdSteppenos] = [206,170,84]
+            colmap[Csa] = [0,254,0]
+            colmap[Med] = [0,254,0]
+            colmap[Csb] = [149,255,0]
+            colmap[Csc] = [203,255,0]
+            colmap[Cwa] = [180,101,0]
+            colmap[Subtropical] = [180,101,0]
+            colmap[Cwb] = [150,102,4]
+            colmap[Cwc] = [94,64,0]
+            colmap[Cfa] = [0,48,0]
+            colmap[Cfb] = [1,80,1]
+            colmap[Oceanic] = [1,80,1]
+            colmap[Oceanicnos] = [1,80,1]
+            colmap[C] = [1,80,1]
+            colmap[Cfc] = [0,120,0]
+            colmap[Dsa] = [254,108,253]
+            colmap[Dsb] = [254,182,255]
+            colmap[Dsc] = [230,202,253]
+            colmap[Dsd] = [202,204,203]
+            colmap[Dwa] = [204,182,255]
+            colmap[Dwb] = [153,124,178]
+            colmap[Dwc] = [138,89,178]
+            colmap[Dwd] = [109,36,179]
+            colmap[Dfa] = [48,0,48]
+            colmap[Continental] = [48,0,48]
+            colmap[D] = [48,0,48]
+            colmap[Dfb] = [101,1,100]
+            colmap[Dfc] = [203,0,203]
+            colmap[Subarctic] = [203,0,203]
+            colmap[Dfd] = [199,21,135]
+            colmap[ET] = [101,255,255]
+            colmap[Tundra] = [101,255,255]
+            colmap[Tundranos] = [101,255,255]
+            colmap[EF] = [99,150,255]
+            colmap[IceCap] = [99,150,255]
+            colmap[IceCapnos] = [99,150,255]
+            colmap[E] = [99,150,255]
+        elif color_type == 2:
+            colmap[Af] = [42,65,15]
+            colmap[TropRainforest] = [42,65,15]
+            colmap[TropRainforestnos] = [42,65,15]
+            colmap[A] = [42,65,15]
+            colmap[Am] = [53,74,19]
+            colmap[TropMonsoon] = [53,74,19]
+            colmap[Aw] = [73,87,32]
+            colmap[As] = [73,87,32]
+            colmap[TropSavanna] = [73,87,32]
+            colmap[TropSavannanos] = [73,87,32]
+            colmap[BWh] = [213,183,133]
+            colmap[HotDesert] = [213,183,133]
+            colmap[HotDesertnos] = [213,183,133]
+            colmap[B] = [213,183,133]
+            colmap[BWk] = [178,153,112]
+            colmap[ColdDesert] = [178,153,112]
+            colmap[ColdDesertnos] = [178,153,112]
+            colmap[BSh] = [123,112,66]
+            colmap[HotSteppe] = [123,112,66]
+            colmap[HotSteppenos] = [123,112,66]
+            colmap[BSk] = [128,117,74]
+            colmap[ColdSteppe] = [128,117,74]
+            colmap[ColdSteppenos] = [128,117,74]
+            colmap[Csa] = [112,104,58]
+            colmap[Med] = [112,104,58]
+            colmap[Csb] = [66,75,31]
+            colmap[Csc] = [66,75,31]
+            colmap[Cwa] = [78,88,36]
+            colmap[Subtropical] = [78,88,36]
+            colmap[Cwb] = [79,81,38]
+            colmap[Cwc] = [135,114,68]
+            colmap[Cfa] = [65,80,27]
+            colmap[Cfb] = [62,77,27]
+            colmap[Oceanic] = [62,77,27]
+            colmap[Oceanicnos] = [62,77,27]
+            colmap[C] = [62,77,27]
+            colmap[Cfc] = [68,78,48]
+            colmap[Dsa] = [148,131,85]
+            colmap[Dsb] = [96,92,50]
+            colmap[Dsc] = [66,70,31]
+            colmap[Dsd] = [57,66,23]
+            colmap[Dwa] = [74,89,34]
+            colmap[Dwb] = [67,83,32]
+            colmap[Dwc] = [57,72,23]
+            colmap[Dwd] = [65,71,28]
+            colmap[Dfa] = [66,85,29]
+            colmap[Continental] = [66,85,29]
+            colmap[D] = [66,85,29]
+            colmap[Dfb] = [55,75,21]
+            colmap[Dfc] = [52,64,20]
+            colmap[Subarctic] = [52,64,20]
+            colmap[Dfd] = [62,71,25]
+            colmap[ET] = [122,119,92]
+            colmap[Tundra] = [122,119,92]
+            colmap[Tundranos] = [122,119,92]
+            colmap[EF] = [204,217,232]
+            colmap[IceCap] = [204,217,232]
+            colmap[IceCapnos] = [204,217,232]
+            colmap[E] = [204,217,232]
+            colmap[SeaTrop] = [20,30,66]
+            colmap[SeaTropnos] = [20,30,66]
+            colmap[SeaTemp] = [20,30,66]
+            colmap[SeaTempnos] = [20,30,66]
+            colmap[SeaFlat] = [20,30,66]
+            colmap[SeaSeasonalIce] = [20,30,66]
+            colmap[SeaPermIce] = [190,208,226]
+            colmap[SeaPermIcenos] = [190,208,226]
+    return colmap
+
+#defines a function to convert climate zone array to a list of rgb values
+def color(inarray, colmap, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path, inarraysea=Sea_Zones):
+    if blend == 1 or sea_type == 5: #if blending is off or there is no sea, just reads from land climate array
+        climmap = inarray
+    else:
+        lsm = np.swapaxes(lsm,1,2)
+        climmap = np.where(lsm[0,:] >= 0.5, inarray, inarraysea) #lsm should be binary, but just in case it isn't in the future I set the land/sea boundary at 0.5
+    climmap = np.where(climmap > 0.1, climmap, 0) #Should fill any empty spaces with 0
+    outmap = np.empty((lonl,latl,3),dtype=np.uint8)
     for y in range(latl):
         for x in range(lonl):
-            if blend == 1 or sea_type == 5:     #if blending is off or there is no sea, just reads from land climate array
-                clim = inarray[x,y]
-            else:                               #otherwise use land/sea mask to determine whether to read from land or sea array 
-                if lsm[0,y,x] >= 0.5:        #lsm should be binary, but just in case it isn't in the future I set the land/sea boundary at 0.5
-                    clim = inarray[x,y]
-                else:
-                    clim = inarraysea[x,y]
-            if land_type == 5:
-                if clim == HPolDesert:
-                    rgb = (255,255,255)
-                elif clim == HDryTundra:
-                    rgb = (128,128,128)
-                elif clim == HMoistTundra:
-                    rgb = (96,128,128)
-                elif clim == HWetTundra:
-                    rgb = (64,128,144)
-                elif clim == HRainTundra:
-                    rgb = (32,128,192)
-                elif clim == HBorDesert:
-                    rgb = (160,160,128)
-                elif clim == HDryScrub:
-                    rgb = (128,160,128)
-                elif clim == HBorMoistForest:
-                    rgb = (96,160,128)
-                elif clim == HBorWetForest:
-                    rgb = (64,160,144)
-                elif clim == HBorRainForest:
-                    rgb = (32,160,192)
-                elif clim == HCoolDesert:
-                    rgb = (192,192,128)
-                elif clim == HCoolDesertScrub:
-                    rgb = (160,192,128)
-                elif clim == HSteppe:
-                    rgb = (128,192,128)
-                elif clim == HCoolMoistForest:
-                    rgb = (96,192,128)
-                elif clim == HCoolWetForest:
-                    rgb = (64,192,144)
-                elif clim == HCoolRainForest:
-                    rgb = (32,192,192)
-                elif clim == HWarmDesert:
-                    rgb = (224,224,128)
-                elif clim == HWarmDesertScrub:
-                    rgb = (192,224,128)
-                elif clim == HThornSteppe:
-                    rgb = (160,224,128)
-                elif clim == HWarmDryForest:
-                    rgb = (128,224,128)
-                elif clim == HWarmMoistForest:
-                    rgb = (96,224,128)
-                elif clim == HWarmWetForest:
-                    rgb = (64,224,144)
-                elif clim == HWarmRainForest:
-                    rgb = (32,224,192)
-                elif clim == HTropDesert:
-                    rgb = (255,255,128)
-                elif clim == HTropDesertScrub:
-                    rgb = (224,255,128)
-                elif clim == HThornWood:
-                    rgb = (192,255,128)
-                elif clim == HVDryForest:
-                    rgb = (160,255,128)
-                elif clim == HTropDryForest:
-                    rgb = (128,255,128)
-                elif clim == HTropMoistForest:
-                    rgb = (96,255,128)
-                elif clim == HTropWetForest:
-                    rgb = (64,255,144)
-                elif clim == HTropRainForest:
-                    rgb = (32,255,160)
-                elif clim == SeaTrop or clim == SeaTropnos:
-                    rgb = (9,120,171)
-                elif clim == SeaTemp or clim == SeaTempnos or clim == SeaFlat:
-                    rgb = (113,171,216)
-                elif clim == SeaSeasonalIce:
-                    rgb = (185,227,255)
-                elif clim == SeaPermIce or clim == SeaPermIcenos:
-                    rgb = (226,248,255)
-                else:
-                    rgb = (0,0,0)
-            elif color_type == 0:
-                if clim == Af or clim == TropRainforest or clim == TropRainforestnos or clim == A:
-                    rgb = (0,0,254)
-                elif clim == Am or clim == TropMonsoon:
-                    rgb = (0,119,255)
-                elif clim == Aw or clim == TropSavanna or clim == TropSavannanos:
-                    rgb = (70,169,250)
-                elif clim == As:
-                    rgb = (127,201,255)
-                elif clim == BWh or clim == HotDesert or clim == HotDesertnos or clim == B:
-                    rgb = (254,0,0)
-                elif clim == BWk or clim == ColdDesert or clim == ColdDesertnos:
-                    rgb = (254,150,149)
-                elif clim == BSh or clim == HotSteppe or clim == HotSteppenos:
-                    rgb = (245,163,1)
-                elif clim == BSk or clim == ColdSteppe or clim == ColdSteppenos:
-                    rgb = (255,219,99)
-                elif clim == Csa or clim == Med:
-                    rgb = (255,255,0)
-                elif clim == Csb:
-                    rgb = (198,199,0)
-                elif clim == Csc:
-                    rgb = (150,150,0)
-                elif clim == Cwa or clim == Subtropical:
-                    rgb = (150,255,150)
-                elif clim == Cwb:
-                    rgb = (99,199,100)
-                elif clim == Cwc:
-                    rgb = (50,150,51)
-                elif clim == Cfa:
-                    rgb = (198,255,78)
-                elif clim == Cfb:
-                    rgb = (102,255,51)
-                elif clim == Cfc or clim == Oceanic or clim == Oceanicnos or clim == C:
-                    rgb = (51,199,1)
-                elif clim == Dsa:
-                    rgb = (255,0,254)
-                elif clim == Dsb:
-                    rgb = (198,0,199)
-                elif clim == Dsc:
-                    rgb = (150,50,149)
-                elif clim == Dsd:
-                    rgb = (150,100,149)
-                elif clim == Dwa:
-                    rgb = (171,177,255)
-                elif clim == Dwb:
-                    rgb = (90,119,219)
-                elif clim == Dwc:
-                    rgb = (76,81,181)
-                elif clim == Dwd:
-                    rgb = (50,0,135)
-                elif clim == Dfa or clim == Continental or clim == D:
-                    rgb = (0,255,255)
-                elif clim == Dfb:
-                    rgb = (56,199,255)
-                elif clim == Dfc or clim == Subarctic:
-                    rgb = (0,126,125)
-                elif clim == Dfd:
-                    rgb = (0,69,94)
-                elif clim == ET or clim == Tundra or clim == Tundranos:
-                    rgb = (178,178,178)
-                elif clim == EF or clim == IceCap or clim == IceCapnos or clim == E:
-                    rgb = (104,104,104)
-                elif clim == SeaTrop or clim == SeaTropnos:
-                    rgb = (9,120,171)
-                elif clim == SeaTemp or clim == SeaTempnos or clim == SeaFlat:
-                    rgb = (113,171,216)
-                elif clim == SeaSeasonalIce:
-                    rgb = (185,227,255)
-                elif clim == SeaPermIce or clim == SeaPermIcenos:
-                    rgb = (226,248,255)
-                else:
-                    rgb = (0,0,0)   #if no recognized climate zone is attached to this position, mark it black for debug purposes
-            elif color_type == 1:
-                if clim == Af or clim == TropRainforest or clim == TropRainforestnos or clim == A:
-                    rgb = (147,1,1)
-                elif clim == Am or clim == TropMonsoon:
-                    rgb = (254,0,0)
-                elif clim == Aw or clim == TropSavanna or clim == TropSavannanos:
-                    rgb = (255,207,207)
-                elif clim == As:
-                    rgb = (254,154,154)
-                elif clim == BWh or clim == HotDesert or clim == HotDesertnos or clim == B:
-                    rgb = (255,207,0)
-                elif clim == BWk or clim == ColdDesert or clim == ColdDesertnos:
-                    rgb = (255,254,101)
-                elif clim == BSh or clim == HotSteppe or clim == HotSteppenos:
-                    rgb = (207,143,20)
-                elif clim == BSk or clim == ColdSteppe or clim == ColdSteppenos:
-                    rgb = (206,170,84)
-                elif clim == Csa or clim == Med:
-                    rgb = (0,254,0)
-                elif clim == Csb:
-                    rgb = (149,255,0)
-                elif clim == Csc:
-                    rgb = (203,255,0)
-                elif clim == Cwa or clim == Subtropical:
-                    rgb = (180,101,0)
-                elif clim == Cwb:
-                    rgb = (150,102,4)
-                elif clim == Cwc:
-                    rgb = (94,64,0)
-                elif clim == Cfa:
-                    rgb = (0,48,0)
-                elif clim == Cfb or clim == Oceanic or clim == Oceanicnos or clim == C:
-                    rgb = (1,80,1)
-                elif clim == Cfc:
-                    rgb = (0,120,0)
-                elif clim == Dsa:
-                    rgb = (254,108,253)
-                elif clim == Dsb:
-                    rgb = (254,182,255)
-                elif clim == Dsc:
-                    rgb = (230,202,253)
-                elif clim == Dsd:
-                    rgb = (202,204,203)
-                elif clim == Dwa:
-                    rgb = (204,182,255)
-                elif clim == Dwb:
-                    rgb = (153,124,178)
-                elif clim == Dwc:
-                    rgb = (138,89,178)
-                elif clim == Dwd:
-                    rgb = (109,36,179)
-                elif clim == Dfa or clim == Continental or clim == D:
-                    rgb = (48,0,48)
-                elif clim == Dfb:
-                    rgb = (101,1,100)
-                elif clim == Dfc or clim == Subarctic:
-                    rgb = (203,0,203)
-                elif clim == Dfd:
-                    rgb = (199,21,135)
-                elif clim == ET or clim == Tundra or clim == Tundranos:
-                    rgb = (101,255,255)
-                elif clim == EF or clim == IceCap or clim == IceCapnos or clim == E:
-                    rgb = (99,150,255)
-                elif clim == SeaTrop or clim == SeaTropnos:
-                    rgb = (9,120,171)
-                elif clim == SeaTemp or clim == SeaTempnos or clim == SeaFlat:
-                    rgb = (113,171,216)
-                elif clim == SeaSeasonalIce:
-                    rgb = (185,227,255)
-                elif clim == SeaPermIce or clim == SeaPermIcenos:
-                    rgb = (226,248,255)
-                else:
-                    rgb = (0,0,0)   #if no recognized climate zone is attached to this position, mark it black for debug purposes
-            elif color_type == 2:
-                if clim == Af or clim == TropRainforest or clim == TropRainforestnos or clim == A:
-                    rgb = (42,65,15)
-                elif clim == Am or clim == TropMonsoon:
-                    rgb = (53,74,19)
-                elif clim == Aw or clim == As or clim == TropSavanna or clim == TropSavannanos:
-                    rgb = (73,87,32)
-                elif clim == BWh or clim == HotDesert or clim == HotDesertnos or clim == B:
-                    rgb = (213,183,133)
-                elif clim == BWk or clim == ColdDesert or clim == ColdDesertnos:
-                    rgb = (178,153,112)
-                elif clim == BSh or clim == HotSteppe or clim == HotSteppenos:
-                    rgb = (123,112,66)
-                elif clim == BSk or clim == ColdSteppe or clim == ColdSteppenos:
-                    rgb = (128,117,74)
-                elif clim == Csa or clim == Med:
-                    rgb = (112,104,58)
-                elif clim == Csb or clim == Csc:
-                    rgb = (66,75,31)
-                elif clim == Cwa or clim == Subtropical:
-                    rgb = (78,88,36)
-                elif clim == Cwb:
-                    rgb = (79,81,38)
-                elif clim == Cwc:
-                    rgb = (135,114,68)
-                elif clim == Cfa:
-                    rgb = (65,80,27)
-                elif clim == Cfb or clim == Oceanic or clim == Oceanicnos or clim == C:
-                    rgb = (62,77,27)
-                elif clim == Cfc:
-                    rgb = (68,78,48)
-                elif clim == Dsa:
-                    rgb = (148,131,85)
-                elif clim == Dsb:
-                    rgb = (96,92,50)
-                elif clim == Dsc:
-                    rgb = (66,70,31)
-                elif clim == Dsd:
-                    rgb = (57,66,23)
-                elif clim == Dwa:
-                    rgb = (74,89,34)
-                elif clim == Dwb:
-                    rgb = (67,83,32)
-                elif clim == Dwc:
-                    rgb = (57,72,23)
-                elif clim == Dwd:
-                    rgb = (65,71,28)
-                elif clim == Dfa or clim == Continental or clim == D:
-                    rgb = (66,85,29)
-                elif clim == Dfb:
-                    rgb = (55,75,21)
-                elif clim == Dfc or clim == Subarctic:
-                    rgb = (52,64,20)
-                elif clim == Dfd:
-                    rgb = (62,71,25)
-                elif clim == ET or clim == Tundra or clim == Tundranos:
-                    rgb = (122,119,92)
-                elif clim == EF or clim == IceCap or clim == IceCapnos or clim == E:
-                    rgb = (204,217,232)
-                elif clim == SeaTrop or clim == SeaTropnos or clim == SeaTemp or clim == SeaTempnos or clim == SeaFlat or clim == SeaSeasonalIce:
-                    rgb = (20,30,66)
-                elif clim == SeaPermIce or clim == SeaPermIcenos:
-                    rgb = (190,208,226)
-                else:
-                    rgb = (0,0,0)   #if no recognized climate zone is attached to this position, mark it black for debug purposes
-                    
-            elif color_type == 3:
-                if clim == Af:
-                    rgb = fulkop.get('Af')
-                elif clim == Am:
-                    rgb = fulkop.get('Am')
-                elif clim == Aw:
-                    rgb = fulkop.get('Aw')
-                elif clim == As:
-                    rgb = fulkop.get('As')
-                elif clim == BWh:
-                    rgb = fulkop.get('BWh')
-                elif clim == BWk:
-                    rgb = fulkop.get('BWk')
-                elif clim == BSh:
-                    rgb = fulkop.get('BSh')
-                elif clim == BSk:
-                    rgb = fulkop.get('BSk')
-                elif clim == Csa:
-                    rgb = fulkop.get('Csa')
-                elif clim == Csb:
-                    rgb = fulkop.get('Csb')
-                elif clim == Csc:
-                    rgb = fulkop.get('Csc')
-                elif clim == Cwa:
-                    rgb = fulkop.get('Cwa')
-                elif clim == Cwb:
-                    rgb = fulkop.get('Cwb')
-                elif clim == Cwc:
-                    rgb = fulkop.get('Cwc')
-                elif clim == Cfa:
-                    rgb = fulkop.get('Cfa')
-                elif clim == Cfb:
-                    rgb = fulkop.get('Cfb')
-                elif clim == Cfc:
-                    rgb = fulkop.get('Cfc')
-                elif clim == Dsa:
-                    rgb = fulkop.get('Dsa')
-                elif clim == Dsb:
-                    rgb = fulkop.get('Dsb')
-                elif clim == Dsc:
-                    rgb = fulkop.get('Dsc')
-                elif clim == Dsd:
-                    rgb = fulkop.get('Dsd')
-                elif clim == Dwa:
-                    rgb = fulkop.get('Dwa')
-                elif clim == Dwb:
-                    rgb = fulkop.get('Dwb')
-                elif clim == Dwc:
-                    rgb = fulkop.get('Dwc')
-                elif clim == Dwd:
-                    rgb = fulkop.get('Dwd')
-                elif clim == Dfa:
-                    rgb = fulkop.get('Dfa')
-                elif clim == Dfb:
-                    rgb = fulkop.get('Dfb')
-                elif clim == Dfc:
-                    rgb = fulkop.get('Dfc')
-                elif clim == Dfd:
-                    rgb = fulkop.get('Dfd')
-                elif clim == ET:
-                    rgb = fulkop.get('ET')
-                elif clim == EF:
-                    rgb = fulkop.get('EF')
-                elif clim == A:
-                    rgb = kopgroup.get('A')
-                elif clim == B:
-                    rgb = kopgroup.get('B')
-                elif clim == C:
-                    rgb = kopgroup.get('C')
-                elif clim == D:
-                    rgb = kopgroup.get('D')
-                elif clim == E:
-                    rgb = kopgroup.get('E')
-                elif clim == TropRainforest:
-                    rgb = redkop.get('TropRainforest')
-                elif clim == TropMonsoon:
-                    rgb = redkop.get('TropMonsoon')
-                elif clim == TropSavanna:
-                    rgb = redkop.get('TropSavanna')
-                elif clim == HotDesert:
-                    rgb = redkop.get('HotDesert')
-                elif clim == HotSteppe:
-                    rgb = redkop.get('HotSteppe')
-                elif clim == ColdDesert:
-                    rgb = redkop.get('ColdDesert')
-                elif clim == ColdSteppe:
-                    rgb = redkop.get('ColdSteppe')
-                elif clim == Med:
-                    rgb = redkop.get('Med')
-                elif clim == Subtropical:
-                    rgb = redkop.get('Subtropical')
-                elif clim == Oceanic:
-                    rgb = redkop.get('Oceanic')
-                elif clim == Continental:
-                    rgb = redkop.get('Continental')
-                elif clim == Subarctic:
-                    rgb = redkop.get('Subarctic')
-                elif clim == Tundra:
-                    rgb = redkop.get('Tundra')
-                elif clim == IceCap:
-                    rgb = redkop.get('IceCap')
-                elif clim == TropRainforestnos:
-                    rgb = noskop.get('TropRainforestnos')
-                elif clim == TropSavannanos:
-                    rgb = noskop.get('TropSavannanos')
-                elif clim == HotDesertnos:
-                    rgb = noskop.get('HotDesertnos')
-                elif clim == HotSteppenos:
-                    rgb = noskop.get('HotSteppenos')
-                elif clim == ColdDesertnos:
-                    rgb = noskop.get('ColdDesertnos')
-                elif clim == ColdSteppenos:
-                    rgb = noskop.get('ColdSteppenos')
-                elif clim == Oceanicnos:
-                    rgb = noskop.get('Oceanicnos')
-                elif clim == Tundranos:
-                    rgb = noskop.get('Tundranos')
-                elif clim == IceCapnos:
-                    rgb = noskop.get('IceCapnos')
-                elif clim == SeaTrop:
-                    rgb = seazon.get('SeaTrop')
-                elif clim == SeaTemp:
-                    rgb = seazon.get('SeaTemp')
-                elif clim == SeaSeasonalIce:
-                    rgb = seazon.get('SeaSeasonalIce')
-                elif clim == SeaPermIce:
-                    rgb = seazon.get('SeaPermIce')
-                elif clim == SeaTropnos:
-                    rgb = redsea.get('SeaTropnos')
-                elif clim == SeaTempnos:
-                    rgb = redsea.get('SeaTempnos')
-                elif clim == SeaPermIcenos:
-                    rgb = redsea.get('SeaPermIcenos')
-                elif clim == SeaFlat:
-                    rgb = redsea.get('SeaFlat')
-                elif clim == HPolDesert:
-                    rgb = hold.get('HPolDesert')
-                elif clim == HDryTundra:
-                    rgb = hold.get('HDryTundra')
-                elif clim == HMoistTundra:
-                    rgb = hold.get('HMoistTundra')
-                elif clim == HWetTundra:
-                    rgb = hold.get('HWetTundra')
-                elif clim == HRainTundra:
-                    rgb = hold.get('HRainTundra')
-                elif clim == HBorDesert:
-                    rgb = hold.get('HBorDesert')
-                elif clim == HDryScrub:
-                    rgb = hold.get('HDryScrub')
-                elif clim == HBorMoistForest:
-                    rgb = hold.get('HBorMoistForest')
-                elif clim == HBorWetForest:
-                    rgb = hold.get('HBorWetForest')
-                elif clim == HBorRainForest:
-                    rgb = hold.get('HBorRainForest')
-                elif clim == HCoolDesert:
-                    rgb = hold.get('HCoolDesert')
-                elif clim == HCoolDesertScrub:
-                    rgb = hold.get('HCoolDesertScrub')
-                elif clim == HSteppe:
-                    rgb = hold.get('HSteppe')
-                elif clim == HCoolMoistForest:
-                    rgb = hold.get('HCoolMoistForest')
-                elif clim == HCoolWetForest:
-                    rgb = hold.get('HCoolWetForest')
-                elif clim == HCoolRainForest:
-                    rgb = hold.get('HCoolRainForest')
-                elif clim == HWarmDesert:
-                    rgb = hold.get('HWarmDesert')
-                elif clim == HWarmDesertScrub:
-                    rgb = hold.get('HWarmDesertScrub')
-                elif clim == HThornSteppe:
-                    rgb = hold.get('HThornSteppe')
-                elif clim == HWarmDryForest:
-                    rgb = hold.get('HWarmDryForest')
-                elif clim == HWarmMoistForest:
-                    rgb = hold.get('HWarmMoistForest')
-                elif clim == HWarmWetForest:
-                    rgb = hold.get('HWarmWetForest')
-                elif clim == HWarmRainForest:
-                    rgb = hold.get('HWarmRainForest')
-                elif clim == HTropDesert:
-                    rgb = hold.get('HTropDesert')
-                elif clim == HTropDesertScrub:
-                    rgb = hold.get('HTropDesertScrub')
-                elif clim == HThornWood:
-                    rgb = hold.get('HThornWood')
-                elif clim == HVDryForest:
-                    rgb = hold.get('HVDryForest')
-                elif clim == HTropDryForest:
-                    rgb = hold.get('HTropDryForest')
-                elif clim == HTropMoistForest:
-                    rgb = hold.get('HTropMoistForest')
-                elif clim == HTropWetForest:
-                    rgb = hold.get('HTropWetForest')
-                elif clim == HTropRainForest:
-                    rgb = hold.get('HTropRainForest')
-                else:
-                    rgb = nozon.get('None')
-                rgb = rgb.split(',')
-                rgb = [int(i) for i in rgb]
-                rgb = tuple(rgb)
-                
-            outlist.append(rgb)
-    return
+            clim = climmap[x,y]
+            outmap[x,y] = colmap[clim]
+    outmap = np.swapaxes(outmap,0,1)
+    return outmap
 
 def MakeMap(in_files="", output_name="output", cfg_loadname="",
          land_type=0,
@@ -658,7 +512,7 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
          ice_def=0,
          sea_def=0
          ):
-    
+
     if isinstance(in_files, str):
         in_files = [in_files]
     for d in in_files:
@@ -731,6 +585,7 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
     thirdl = int(round(timel/3))
     lonl = len(lon)
     latl = len(lat)
+    
 
     if in_num < 2:
         tas_ar = ds['tas'][:]    #2-meter air temperature, Kelvin
@@ -828,8 +683,7 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
         if use_ts == 1:
             ts_bin = ts_ar
 
-    #Interpolation routine. The math here gets a bit tricky because I'm not just adding in data between the existing data points (that would offset the map weirdly),
-    #I'm breaking the cell each data point occupies into 4 smaller cells, and then the data in each cell is a weighted average of that from its "parent" cell and the adjacent cells
+    #Interpolation routine. 
     if interp > 0:
         print('Interpolating Data to Higher Resolution...')
         if dum_ice == 1:
@@ -1093,9 +947,7 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
             precips_ar = np.empty((timel,latl,lonl))
             for y in range(latl):       #Bit of an inefficient approach, but haven't quite figured out how to do this as a numpy operation
                 for x in range(lonl):
-                    precips_ar[:,y,x] = pr_stack[sum_max[y,x],:,y,x]    #choose appropriate slice corresponding to the maximum half-year total of indicator value
-            
-            
+                    precips_ar[:,y,x] = pr_stack[sum_max[y,x],:,y,x]    #choose appropriate slice corresponding to the maximum half-year total of indicator value            
             Summer_Precip_ar = np.mean(precips_ar[:halfl,:,:], axis=0)*2592000000*6
             Max_Sum_Precip_ar = np.amax(precips_ar[:halfl,:,:], axis=0)*2592000000
             Min_Sum_Precip_ar = np.amin(precips_ar[:halfl,:,:], axis=0)*2592000000
@@ -1169,6 +1021,7 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
     print('Determining Climate Zones...')
     for y in range(latl):
         for x in range(lonl):
+            clim = 0    #makes debug easier
             
             #find data for specific location
             Avg_Temp = Avg_Temp_ar[y,x]
@@ -1513,26 +1366,20 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
 
     #Applies the coloring function to our climate zone arrays and draws images from them
     print('Drawing Climate Maps...')
+    colmap = make_colmap(color_type, col_list_path)
     if blend == 1:
-        Kop_rgb = []
-        color(Koppen_Full, Kop_rgb, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path)
-        landmap = Image.new('RGB',(lonl,latl))
-        landmap.putdata(Kop_rgb)
+        Kop_rgb = color(Koppen_Full, colmap, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path)
+        landmap = Image.fromarray(Kop_rgb)
         savename = output_name + '_land.png'
         landmap.save(savename)
         if sea_type != 5:
-            Sea_rgb = []
-            color(Sea_Zones, Sea_rgb, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path)
-            seamap = Image.new('RGB',(lonl,latl))
-            seamap.putdata(Sea_rgb)
+            Sea_rgb = color(Sea_Zones, colmap, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path)
+            seamap = Image.fromarray(Sea_rgb)
             savename = output_name + '_sea.png'
             seamap.save(savename)
-
     else:
-        blend_rgb = []
-        color(Koppen_Full, blend_rgb, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path, inarraysea=Sea_Zones)
-        blendmap = Image.new('RGB',(lonl,latl))
-        blendmap.putdata(blend_rgb)
+        blend_rgb = color(Koppen_Full, colmap, latl, lonl, lsm, blend, land_type, sea_type, color_type, col_list_path, inarraysea=Sea_Zones)
+        blendmap = Image.fromarray(blend_rgb)
         savename = output_name + '.png'
         blendmap.save(savename)
 
@@ -1750,7 +1597,15 @@ Sea Climate Zones
 4: No sea climate zones, just flat blue
 5: Exclude seas entirely, produce no output (appropriate for all-land planets)
 Set Sea Climate Type: '''))
-                if land_type != 5:
+                if land_type == 5:
+                    color_type = int(input('''
+Color List
+0: Default; based on the key on Wikipedia's Holdridge Life Zones page, Artifexian, etc.
+1: Import custom color list (see defaultcolor.ini for template)
+Set Color List: '''))
+                    if color_type > 0:
+                        color_type = 3
+                else:
                     color_type = int(input('''
 Color List
 0: Default (blue rainforest); used by Wikipedia, Artifexian, etc.
