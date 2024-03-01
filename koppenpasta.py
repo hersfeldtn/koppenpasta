@@ -765,7 +765,7 @@ def MakeMap(in_files="", output_name="output", cfg_loadname="",
                             lapse_first[t,y,x] = 10000  #obviously unphysical placeholder if there isn't enough data
                         else:
                             lapse_first[t,y,x] = nsum / n   #otherwise put in average
-                            lapses.append(lapse_bin[t,y,x])
+                            lapses.append(lapse_first[t,y,x])
                 tot_avg = stat.mean(lapses)
                 for y in range(latl):
                     for x in range(lonl):
