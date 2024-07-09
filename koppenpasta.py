@@ -1541,7 +1541,7 @@ Set Color List: '''))
                 if use_topo == 1:
                     if topo_path == 'prompt':
                         topo_map = input('New Topography Map for temperature adjustmet (input "0" to not use topography): ')
-                        if int(topo_map) == 0:
+                        if str(topo_map) == "0":
                             use_topo = 0
                             break
                         else:
@@ -1553,7 +1553,7 @@ Set Color List: '''))
                         use_topo = 2
                         print('No Topography Map found at '+str(topo_path))
                         topo_map = input('New Topography Map for temperature adjustmet (input "0" to not use topography): ')
-                        if int(topo_map) == 0:
+                        if str(topo_map) == "0":
                             use_topo = 0
                             break
                         else:
