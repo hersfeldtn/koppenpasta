@@ -99,9 +99,9 @@ Made 2022 by Nikolai Hersfeldt
 
     #Configuration prompts
     infile = ""
-    while infile != "stop":
+    while infile != path+"stop":
         infile = path+input('Input NetCDF filename or folder of files ("stop" for no more inputs): ')
-        if infile in "stop":
+        if infile in path+"stop":
             print("")
         elif os.path.exists(infile):
             if os.path.isdir(infile):
