@@ -1,72 +1,33 @@
 # koppenpasta
 A collection of scripts for use with ExoPlaSim, with the intention of allowing the user to import arbitrary topography and then produce climate maps of the output
+Currently supported climate classification systems are:
+- Koppen-Geiger
+- Koppen-Trewartha
+- Holdridge Life Zones
+- Thornthwaite-Feddemma
+- Prentice et al. 1992 BIOME1 model
+- Hersfeldt/Pasta Bioclimate Zones
+- Whittaker Biomes
+- Woodward Vegetation Types
+- IPCC Climate Zones
+- World Climate Regions
+- Two-Parameter Koppen-Alike
+- Koppen-Geiger Unproxied
 
 Includes:
 
 koppenpasta.py
-  Script to take data from NetCDF files produced by ExoPlaSim and produce maps of Koppen climate zones (or Holdridge Life Zones).
+  Script to take data from NetCDF files produced by ExoPlaSim and produce maps of climate zones (or Holdridge Life Zones).
   Requres NetCDF4, PIL, numpy, and scipy
-  
-  As of 1.2, can be imported and run as the koppenpasta.MakeMap() function. Easiest way to do this is to create a config and then run it the form:
-  
-  koppenpasta.MakeMap('infile.nc', 'outfile', 'config.ini')
-  
-  where infile.nc is a NetCDF file, outfile the name of the output imag, and config.ini is the config. But if you desire it can take all the following optional arguments, most corresponding to the configuration options shown when run in konsole (y/n options should be input as 1/0 here):
-  
-  in_files: string showing the path to a NetCDF file or folder containing NetCDF files, all of which will be used, or a list of such strings.
-  
-  output_name: name for the output image
-  
-  cfg_loadname: name for a config .ini to be used (will overwrite all other options)
-  
-  land_type: Land Climate Zones (0-5)
-  
-  sea_type: Sea Climate Zones (0-5)
-  
-  color_type: Color List (0-3)
-  
-  col_list_path: path to custom color list
-  
-  blend: Land/Sea Blend (0-1)
-  
-  bin_num: Bin Size (should be at least 1)
-  
-  interp: Interpolation Factor (0 for none)
-  
-  dum_ice: Dummy Sea Ice (1/0)
-  
-  use_topo: Adjust Temp by Topography (1/0)
-  
-  topo_path: path to topography map to be used for above
-  
-  maxel: Maximum elevation of topography map (m)
-  
-  minel: Minimum elevation of topography map (m)
-  
-  gravity: Surface gravity for use with topography map (m/s^2)
-  
-  blend_topo: Blend by Topography Map (1/0)
-  
-  sealev: Sea Level (m)
-  
-  sum_def: Summer Definition (0-1)
-  
-  temp_def: Temperate/Continental Boundary (0-1)
-  
-  arid_def: Hot/Cold Arid Boundary (0-1)
-  
-  med_def: Mediterranean Definition (0-1)
-  
-  wet_def: Wet-Summer Definition (0-1)
-  
-  add_def: Additional Wet Season Requirements (0-3)
-  
-  prio_def: Med/Wet-Summer Priority (0-1)
-  
-  ice_def: Arid/Polar Priority (0-2)
-  
-  sea_def: Sea Ice Definition (0-1)
-  
+  Can be run directly and used for command-line setup
+  Or can be loaded and run in python with koppenpasta.Make_map(files,opts)
+    where files is the name of a file, a list of files, or a directory which will be searched for .nc files
+    and opts is a dictionary of options or name of a config file, or can be left out to run with defaults
+
+kpasta_options.cfg
+  Example options, consult the internal documentation for use of each option.
+  If in same directory as koppenpasta, the script will automatically load options to override its internal defaults
+  Can be renamed and altered, then selected for use during script setup or by Make_Map
 
 defaultcolor.ini
   config file to allow user to select their own rgb values for the maps output by the above script
