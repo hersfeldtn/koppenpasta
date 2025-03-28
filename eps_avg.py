@@ -103,6 +103,7 @@ Made 2022 by Nikolai Hersfeldt
         infile = path+input('Input NetCDF filename or folder of files ("stop" for no more inputs): ')
         if infile in "stop":
             print("")
+            break
         elif os.path.exists(infile):
             if os.path.isdir(infile):
                 found = False
