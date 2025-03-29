@@ -120,6 +120,7 @@ option_def = {
     'const_lapse_rate': None,           # constant lapse rate to use in place of empirical lapse rate (K/km, positive for increasing temp at lower elevation)
     'efficient': False,                 # use efficient version of climate algorithms, if available
     'image_scale': None,                # scale to apply to final image, using nearest-neighbor interpolation; can be number to multiply resolution or tuple of (x,y) target resoluion
+    'font_size': 20,                    # font size for map key and chart
     'debug_file': False,                # produce additional .nc file containing internally used data
     'force_alt_data': False,            # force use of Alternate_Data function instead of climate-specific _Data function
     'temp_adjust': -273.15,             # factor to add for all temperature adjustments (-273.15 to convert from K to C)
@@ -133,7 +134,7 @@ option_def = {
     'pet_use_vegf': True,               # use vegf data to adjust PET surface data if using asce-pm method
     
     #options used for all evapotranspiration calculations (used for prentice, pasta, and unproxied KG)
-    'evap_estimate_sea': True,          # use PET and simple soil moisture model to estimate land-equivalent evaporation in sea cells
+    'estimate_evap': 'sea',             # where to use PET and simple soil moisture model to estimate evaporation
 
     #options used for all GDD calculations (used for prentice, pasta, and unproxied KG)
     'gdd_productivity_modifier': 1,     # scale to be applied to GDD to account for average photosynthetic productivity relative to Earth
@@ -1286,10 +1287,10 @@ name_key = {
     SeaSeasonalIce: 'Seasonal Sea Ice',
     SeaPermIce: 'Permanent Sea Ice',
     SeaFlat: 'Sea',
-    Af:  'Af:  Tropical Rainforest',
-    Am:  'Am:  Tropical Monsoon',
-    Aw:  'Aw:  Tropical Savanna',
-    As:  'As:  Dry-summer Tropical Savanna',
+    Af:  'Af: Tropical Rainforest',
+    Am:  'Am: Tropical Monsoon',
+    Aw:  'Aw: Tropical Savanna',
+    As:  'As: Dry-summer Tropical Savanna',
     BWh: 'BWh: Hot Desert',
     BWk: 'BWk: Cold Desert',
     BSh: 'BSh: Hot Steppe',
@@ -1315,21 +1316,21 @@ name_key = {
     Dfb: 'Dfb: Warm-summer Continental',
     Dfc: 'Dfc: Subarctic Continental',
     Dfd: 'Dfd: Frigid Continental',
-    ET:  'ET:  Tundra',
-    EF:  'EF:  Ice Cap',
+    ET:  'ET: Tundra',
+    EF:  'EF: Ice Cap',
     A:   'A: Tropical',
     B:   'B: Arid',
     C:   'C: Temperate',
     D:   'D: Continental',
     E:   'E: Polar',
-    BW:  'BW:  Desert',
-    BS:  'BS:  Steppe',
-    Cs:  'Cs:  Mediterranean Temperate',
-    Cw:  'Cw:  Monsoon Temperate',
-    Cf:  'Cf:  Humid Temperate',
-    Ds:  'Ds:  Mediterranean Continental',
-    Dw:  'Dw:  Monsoon Continental',
-    Df:  'Df:  Humid Continental',
+    BW:  'BW: Desert',
+    BS:  'BS: Steppe',
+    Cs:  'Cs: Mediterranean Temperate',
+    Cw:  'Cw: Monsoon Temperate',
+    Cf:  'Cf: Humid Temperate',
+    Ds:  'Ds: Mediterranean Continental',
+    Dw:  'Dw: Monsoon Continental',
+    Df:  'Df: Humid Continental',
     TropRainforest: 'Tropical Rainforest',
     TropMonsoon: 'Tropical Monsoon',
     TropSavanna: 'Tropical Savanna',
@@ -1506,110 +1507,110 @@ name_key = {
     PBHotDesert: 'Hot Desert',
     PBSemiDesert: 'Semidesert',
     PBIce: 'Ice/Polar Desert',
-    TUr:  'TUr:  Tropical Rainforest',
+    TUr:  'TUr: Tropical Rainforest',
     TUrp: 'TUrp: Tropical Hyperpluvial Rainforest',
-    TUf:  'TUf:  Tropical Forest',
+    TUf:  'TUf: Tropical Forest',
     TUfp: 'TUfp: Tropical Monsoon Forest',
-    TUs:  'TUs:  Tropical Moist Savanna',
+    TUs:  'TUs: Tropical Moist Savanna',
     TUsp: 'TUsp: Tropical Moist Monsoon Savanna',
-    TUA:  'TUA:  Tropical Dry Savanna',
+    TUA:  'TUA: Tropical Dry Savanna',
     TUAp: 'TUAp: Tropical Dry Monsoon Savanna',
-    TQf:  'TQf:  Quasitropical Forest',
+    TQf:  'TQf: Quasitropical Forest',
     TQfp: 'TQfp: Quasitropical Monsoon Forest',
-    TQs:  'TQs:  Quasitropical Moist Savanna',
+    TQs:  'TQs: Quasitropical Moist Savanna',
     TQsp: 'TQsp: Quasitropical Moist Monsoon Savanna',
-    TQA:  'TQA:  Quasitropical Dry Savanna',
+    TQA:  'TQA: Quasitropical Dry Savanna',
     TQAp: 'TQAp: Quasitropical Dry Monsoon Savanna',
-    TF:   'TF:   Tropical Twilight',
-    TG:   'TG:   Tropical Dark',
-    CTf:  'CTf:  Subtropical Forest',
+    TF:   'TF: Tropical Twilight',
+    TG:   'TG: Tropical Dark',
+    CTf:  'CTf: Subtropical Forest',
     CTfp: 'CTfp: Subtropical Monsoon Forest',
-    CTs:  'CTs:  Subtropical Moist Savanna',
+    CTs:  'CTs: Subtropical Moist Savanna',
     CTsp: 'CTsp: Subtropical Moist Monsoon Savanna',
-    CDa:  'CDa:  Oceanic Temperate',
+    CDa:  'CDa: Oceanic Temperate',
     CDap: 'CDap: Oceanic Temperate Rainforest',
-    CDb:  'CDb:  Continental Temperate',
+    CDb:  'CDb: Continental Temperate',
     CDbp: 'CDbp: Continental Temperate Rainforest',
-    CEa:  'CEa:  Oceanic Boreal',
+    CEa:  'CEa: Oceanic Boreal',
     CEap: 'CEap: Oceanic Boreal Rainforest',
-    CEb:  'CEb:  Continental Boreal',
+    CEb:  'CEb: Continental Boreal',
     CEbp: 'CEbp: Continental Boreal Rainforest',
-    CEc:  'CEc:  Percontinental Boreal',
+    CEc:  'CEc: Percontinental Boreal',
     CEcp: 'CEcp: Percontinental Boreal Rainforest',
-    CMa:  'CMa:  Oceanic Submediterranean',
-    CMb:  'CMb:  Continental Submediterranean',
+    CMa:  'CMa: Oceanic Submediterranean',
+    CMb:  'CMb: Continental Submediterranean',
     CAMa: 'CAMa: Oceanic Mediterranean',
     CAMb: 'CAMb: Continental Mediterranean',
-    CAa:  'CAa:  Cool Dry Savanna',
+    CAa:  'CAa: Cool Dry Savanna',
     CAap: 'CAap: Cool Dry Monsoon Savanna',
-    CAb:  'CAb:  Cold Steppe',
+    CAb:  'CAb: Cold Steppe',
     CAbp: 'CAbp: Cold Pluvial Steppe',
-    CFa:  'CFa:  Oceanic Tundra',
-    CFb:  'CFb:  Continental Tundra',
-    CG:   'CG:   Cold Barren',
-    CI:   'CI:   Ice',
-    HTf:  'HTf:  Supertropical Forest',
+    CFa:  'CFa: Oceanic Tundra',
+    CFb:  'CFb: Continental Tundra',
+    CG:   'CG: Cold Barren',
+    CI:   'CI: Ice',
+    HTf:  'HTf: Supertropical Forest',
     HTfp: 'HTfp: Supertropical Monsoon Forest',
-    HTs:  'HTs:  Supertropical Moist Savanna',
+    HTs:  'HTs: Supertropical Moist Savanna',
     HTsp: 'HTsp: Supertropical Moist Monsoon Savanna',
-    HDa:  'HDa:  Hot Swelter',
-    HDap: 'HDa:  Hot Pluvial Swelter',
-    HDb:  'HDb:  Torrid Swelter',
+    HDa:  'HDa: Hot Swelter',
+    HDap: 'HDa: Hot Pluvial Swelter',
+    HDb:  'HDb: Torrid Swelter',
     HDbp: 'HDbp: Torrid Pluvial Swelter',
-    HDc:  'HDc:  Boiling Swelter',
+    HDc:  'HDc: Boiling Swelter',
     HDcp: 'HDcp: Boiling Pluvial Swelter',
-    HMa:  'HMa:  Hot Subparamediterranean',
-    HMb:  'HMb:  Torrid Subparamediterranean',
-    HMc:  'HMc:  Boiling Subparamediterranean',
+    HMa:  'HMa: Hot Subparamediterranean',
+    HMb:  'HMb: Torrid Subparamediterranean',
+    HMc:  'HMc: Boiling Subparamediterranean',
     HAMa: 'HAMa: Hot Paramediterranean',
     HAMb: 'HAMb: Torrid Paramediterranean',
     HAMc: 'HAMc: Boiling Paramediterranean',
-    HAa:  'HAa:  Hot Dry Savanna',
+    HAa:  'HAa: Hot Dry Savanna',
     HAap: 'HAap: Hot Dry Monsoon Savanna',
-    HAb:  'HAb:  Torrid Steppe',
+    HAb:  'HAb: Torrid Steppe',
     HAbp: 'HAbp: Torrid Pluvial Steppe',
-    HAc:  'HAc:  Boiling Steppe',
+    HAc:  'HAc: Boiling Steppe',
     HAcp: 'HAcp: Boiling Pluvial Steppe',
-    HFa:  'HFa:  Hot Parch',
-    HFb:  'HFb:  Torrid Parch',
-    HFc:  'HDc:  Boiling Parch',
-    HG:   'HG:   Hot Barren',
-    ETf:  'ETf:  Extratropical Forest',
+    HFa:  'HFa: Hot Parch',
+    HFb:  'HFb: Torrid Parch',
+    HFc:  'HDc: Boiling Parch',
+    HG:   'HG: Hot Barren',
+    ETf:  'ETf: Extratropical Forest',
     ETfp: 'ETfp: Extratropical Monsoon Forest',
-    ETs:  'ETs:  Extratropical Moist Savanna',
+    ETs:  'ETs: Extratropical Moist Savanna',
     ETsp: 'ETsp: Extratropical Moist Monsoon Savanna',
-    EDa:  'EDa:  Superseasonal Extracontinental',
+    EDa:  'EDa: Superseasonal Extracontinental',
     EDap: 'EDap: Superseasonal Extracontinental Rainforest',
-    EDb:  'EDb:  Hyperseasonal Extracontinental',
+    EDb:  'EDb: Hyperseasonal Extracontinental',
     EDbp: 'EDbp: Hyperseasonal Extracontinental Rainforest',
-    EMa:  'EMa:  Superseasonal Subextramediterranean',
-    EMb:  'EMb:  Hyperseasonal Subextramediterranean',
+    EMa:  'EMa: Superseasonal Subextramediterranean',
+    EMb:  'EMb: Hyperseasonal Subextramediterranean',
     EAMa: 'EAMa: Superseasonal Extramediterranean',
     EAMb: 'EAMb: Hyperseasonal Extramediterranean',
-    EAa:  'EAa:  Superseasonal Dry Savanna',
+    EAa:  'EAa: Superseasonal Dry Savanna',
     EAap: 'EAap: Superseasonal Dry Monsoon Savanna',
-    EAb:  'EAb:  Hyperseasonal Steppe',
+    EAb:  'EAb: Hyperseasonal Steppe',
     EAbp: 'EAbp: Hyperseasonal Pluvial Steppe',
-    EFa:  'EFa:  Superseasonal Pulse',
-    EFb:  'EDb:  Hyperseasonal Pulse',
-    EG:   'EG:   Extraseasonal Barren',
-    Ada:  'Ada:  Warm Semidesert',
-    Aha:  'Aha:  Warm Desert',
-    Adc:  'Adc:  Cold Semidesert',
-    Ahc:  'Ahc:  Cold Desert',
-    Adh:  'Adh:  Hot Semidesert',
-    Ahh:  'Ahh:  Hot Desert',
-    Ade:  'Ade:  Extraseasonal Semidesert',
-    Ahe:  'Ahe:  Extraseasonal Desert',
-    Ofi:  'Ofi:  Permanent Sea Ice',
-    Ofd:  'Ofd:  Seasonal Sea Ice',
-    Ofg:  'Ofg:  Dark Seasonal Sea Ice',
-    Og:   'Og:   Dark Ocean',
-    Oc:   'Oc:   Cool Ocean',
-    Ot:   'Ot:   Tropical Ocean',
-    Oh:   'Oh:   Hot Ocean',
-    Or:   'Or:   Torrid Ocean',
-    Oe:   'Oe:   Extraseasonal Ocean'
+    EFa:  'EFa: Superseasonal Pulse',
+    EFb:  'EDb: Hyperseasonal Pulse',
+    EG:   'EG: Extraseasonal Barren',
+    Ada:  'Ada: Warm Semidesert',
+    Aha:  'Aha: Warm Desert',
+    Adc:  'Adc: Cold Semidesert',
+    Ahc:  'Ahc: Cold Desert',
+    Adh:  'Adh: Hot Semidesert',
+    Ahh:  'Ahh: Hot Desert',
+    Ade:  'Ade: Extraseasonal Semidesert',
+    Ahe:  'Ahe: Extraseasonal Desert',
+    Ofi:  'Ofi: Permanent Sea Ice',
+    Ofd:  'Ofd: Seasonal Sea Ice',
+    Ofg:  'Ofg: Dark Seasonal Sea Ice',
+    Og:   'Og: Dark Ocean',
+    Oc:   'Oc: Cool Ocean',
+    Ot:   'Ot: Tropical Ocean',
+    Oh:   'Oh: Hot Ocean',
+    Or:   'Or: Torrid Ocean',
+    Oe:   'Oe: Extraseasonal Ocean'
     }
 
 
@@ -1831,6 +1832,8 @@ Clim_func = {}
 #Decide how an option value string should be interpreted and returns the appropriate data type
 def interp_opt(opt_val):
     opt_type = 0
+    if not isinstance(opt_val,str):
+        return opt_val
     for c in opt_val:
         if c.isnumeric() or c=='-':     #treat as int if all numbers or minus sign
             pass
@@ -2443,7 +2446,7 @@ def make_res(in_res, scale=None):
             print('  No interpolation scale provided to make_res, returning input scale')
             return in_res
     if isinstance(scale, tuple):
-        return scale
+        return (scale[1],scale[0])  #switch from x,y to lat,lon
     return (round(in_res[0] * scale), round(in_res[1] * scale))
 
 #Check if res has already been made, and if not make it, returning res either way
@@ -2754,8 +2757,8 @@ def Calc_GDD(tas, base=5, plat_start=30, plat_end=10000, comp=20000):
     back_slope = GDD_max / (comp - plat_end)
 
     GDD = tas - base    #count degrees from base
-    GDD = np.where(GDD > plat_start, GDD_max, GDD)  #flatten after plateau start
-    GDD = np.where(GDD > plat_end, GDD_max - back_slope * (tas - plat_end), GDD)    #decline after plateau end
+    GDD = np.where(tas > plat_start, GDD_max, GDD)  #flatten after plateau start
+    GDD = np.where(tas > plat_end, GDD_max - back_slope * (tas - plat_end), GDD)    #decline after plateau end
     GDD = np.maximum(GDD, 0)    #clamp to positive
 
     GDD *= 30 * opt('month_length') * opt('gdd_productivity_modifier')    #convert to GDD/month and apply modifiers
@@ -3416,18 +3419,23 @@ def Make_key(maps, colmap=None):
                 zones[name_key[v]] = v
             except:
                 zones[k] = v
-    maxl = 10
-    for k in zones:
-        maxl = max(maxl, len(k))
     
-    key_im = Image.new(mode="RGB", size=(6*maxl+80,len(zones)*25+5), color=(0,0,0))
+    key_im = Image.new(mode="RGB", size=(1000,len(zones)*25+5), color=(0,0,0))
     im = ImageDraw.Draw(key_im)
-    #font = ImageFont.load("arial.pil") #experimented with using better font, didn't work
+    font_size = opt('font_size')
+    font = ImageFont.load_default(size=font_size) #load default font
     h = 0
     for k, v in zones.items():
         im.rectangle([5, h+5, 25, h+25], fill=tuple(colmap[v]), outline=(100,100,100), width=1)     #draw box in zone color
-        im.text((30, h+10), k, fill=(255,255,255), font_size = 20)#, font=font)   #write zone name
+        im.text((30, h+(12-int(font_size/2))), k, fill=(255,255,255), font=font)   #write zone name
         h += 25
+    im_dat = np.asarray(key_im)
+    col = 999
+    while True:
+        if np.amax(im_dat[:,col,:]) > 0 or col < 0: #scan from the right edge to find first column with color in it, to find edge of text
+            break
+        col -= 1
+    key_im = key_im.crop((0,0,col+6,key_im.height))   #crop to 5 pixels right of longest text
     return key_im
 
 #Make chart of points in map by average temp and total precipitation, with each point colored by zone
@@ -3452,18 +3460,27 @@ def Make_chart(clim, par):
     plen = int(pmax-pmin)
     
     colmap = Get_colmap()
+
+    font_size = opt('font_size')
+    font = ImageFont.load_default(size=font_size) #load default font
+
+    ex = int(max(0, font_size/1.5 * len(str(pmax)) - 30))
     
-    chart_im = Image.new(mode="RGB", size=(60+tlen, 70+plen), color=(0,0,0))
+    chart_im = Image.new(mode="RGB", size=(ex+60+tlen, 70+plen), color=(0,0,0))
     im = ImageDraw.Draw(chart_im)
 
-    im.line ([(38,19),(38,20+plen),(40+tlen,20+plen)], fill=(255,255,255), width=2) #chart axes
+
+
+    
+
+    im.line ([(ex+38,19),(ex+38,20+plen),(ex+40+tlen,20+plen)], fill=(255,255,255), width=2) #chart axes
 
     for p in range(int(1+plen/100)):
-        im.line([(33,19+p*100),(38,19+p*100)], fill=(255,255,255), width=1)
-        im.text((31-len(str(pmax-p*100))*6,14+p*100), str(pmax-p*100), fill=(255,255,255))    #precip markings
+        im.line([(ex+33,19+p*100),(ex+38,19+p*100)], fill=(255,255,255), width=1)
+        im.text((ex+31,18+p*100), str(pmax-p*100), fill=(255,255,255), font=font, anchor='rm')    #precip markings
     for t in range(int(1+tlen/100)):
-        im.line([(40+t*100,20+plen),(40+t*100,26+plen)], fill=(255,255,255), width=1)   #temp markings
-        im.text((41+t*100-len(str(mint+t*10))*3,29+plen), str(mint+t*10), fill=(255,255,255))
+        im.line([(ex+40+t*100,20+plen),(ex+40+t*100,26+plen)], fill=(255,255,255), width=1)   #temp markings
+        im.text((ex+40+t*100,29+plen), str(mint+t*10), fill=(255,255,255), font=font, anchor='mt')
     
 
     tco = 40 + np.round((ta-mint)*10)   #map coordinates
@@ -3555,6 +3572,7 @@ def Save_opts(in_opts=None):
             else:
                 print(f" No config file found at {in_opts}")
         add_opt(in_opts)    #input list override defaults and kpasta_options
+
     for o in ('color_file','topo_map'):
         f = opt(o)
 
@@ -3563,9 +3581,20 @@ def Save_opts(in_opts=None):
                 add_opt({o: path+f})
             else:
                 print(f'WARNING: no file found at {f} for {o}')
+
     f = opt('outname')
     if "/" not in f and "\\" not in f:  #if outname doesn't look like a path, presume path should be added
         add_opt({'outname': path+f})
+    
+    try:
+        evap = opt('evap_estimate_sea')     #backwards compatibility with deprecated options
+        if evap:
+            add_opt({'estimate_evap': 'sea'})
+        else:
+            add_opt({'estimate_evap': 'never'})
+    except:
+        pass
+
     return
 
 #Produce climate zone arrays from files
@@ -4852,25 +4881,33 @@ def Biome_Data(dat):
     
     rss = Get_nc(dat, 'rss')
     ps = Get_nc(dat, 'ps')
-    if opt('temp_adjust_ts'):
-        ts = Get_nc(dat, 'ts')
-        tdif = tas - ts #adjustment from surface to 2-meter to apply to maxt and mint
-    else:
+
+    if opt('temp_tunings') == 'tavg':
+        maxt = - opt('temp_adjust')
+        mint = - opt('temp_adjust')
         tdif = 0
-    maxt = Get_nc(dat, 'maxt', adjust=tdif)
-    mint = Get_nc(dat, 'mint', adjust=tdif)
+    else:
+        if opt('temp_adjust_ts'):
+            ts = Get_nc(dat, 'ts')
+            tdif = tas - ts #adjustment from surface to 2-meter to apply to maxt and mint
+        else:
+            tdif = 0
+        maxt = Get_nc(dat, 'maxt', adjust=tdif)
+        mint = Get_nc(dat, 'mint', adjust=tdif)
     pr = Get_nc(dat, 'pr', no_interp = True)
 
-    if opt('interp_scale') and opt('evap_estimate_sea'):
-        pet_small = Get_pet(dat, {}, no_interp = True)
-        evap = Get_nc(dat, 'evap', no_interp = True)
-        evap *= -opt('precip_adjust')   #convert from m/s to mm/month (and flip sign)
-        evap_sea = Estimate_evap(pet_small, pr*opt('precip_adjust'))  #estimate land-equivalent evaporation over sea areas
-        evap = np.where(get_mask(dat, 'lsm', convert=True), evap, evap_sea)
-        evap = Interp(evap)
+    if opt('estimate_evap') == 'all' or (opt('interp_scale') and opt('estimate_evap') == 'sea'):
+        pet_small = Get_pet(dat, {}, no_interp = True)  #use original resolution
+        evap = Estimate_evap(pet_small, pr*opt('precip_adjust'))  #estimate evaporation from pet and pr
+        if opt('estimate_evap') == 'sea':
+            evap_land = Get_nc(dat, 'evap', no_interp = True)
+            evap_land *= -opt('precip_adjust')   #convert from m/s to mm/month (and flip sign)
+            evap = np.where(get_mask(dat, 'lsm', convert=True), evap_land, evap)    #apply evap estimation only to sea areas
+        if opt('interp_scale'):
+            evap = Interp(evap)
     else:
         evap = Get_nc(dat, 'evap')
-        evap *= -opt('precip_adjust')
+        evap *= -opt('precip_adjust')   #convert from m/s to mm/month (and flip sign)
     
     pet= Get_pet(dat,
                     {
@@ -4922,11 +4959,16 @@ def Biome_Data(dat):
 
 def Biome_Param(data):
     tas = data['tas']   #2-meter air temperature in C
-    maxt = data['maxt']     #absolute maximum temperature in C
     evap = data['evap']     #evaporation in mm/month
     pr = data['pr']         #precipitation in mm/month
     pet = data['pet']   #potential evapotranspiration in mm/year
-    mint = data['mint']     #absolute minimum temperature in C
+
+    if opt('temp_tunings') == 'tavg':
+        maxt = tas
+        mint = tas
+    else:
+        maxt = data['maxt']     #absolute maximum temperature in C
+        mint = data['mint']     #absolute minimum temperature in C
 
     
     Min_Abs = np.amin(mint, 0)
@@ -6129,7 +6171,7 @@ if __name__ == "__main__":
 
     while True:
         print('')
-        if Prompt_bool('Run again with same files? (y/n)'):
+        if Prompt_bool('Run again with same files? (y/n): '):
             fi, in_opts = Get_input(False)
             Make_map(files, in_opts)
         else:
