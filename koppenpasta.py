@@ -8,6 +8,8 @@ import configparser
 from PIL import Image, ImageFont, ImageDraw
 import os
 
+ver_num = "2.0.2"
+
 ### GUIDANCE
 
 # The script has been overhauled in 2.0 to be easier to modify
@@ -167,9 +169,11 @@ option_def = {
     'h_no_pet': False,                  # index zones by precipitation and biotemperature only, with no PET input
     'h_estimate_biot_avg': False,       # estimate biotemperate from average temperature using fit to Earth values
 
-    #pasta options                          those marked (kg) also apply to unproxied koppen-geiger
+    #pasta options                          those marked (kg) also apply to unproxied koppen-geiger and those marked (p) also aply to Prentice
     'pas_boil_pres': True,              # calculate boiling point from surface pressure, rather than using constant 100 C
     'pas_ice_def': 'ice',               # (kg)parameter for defining ice cover, for land and sea
+    'pas_med_thresh': 0,                # (kg)forces alternate GrS threshold for Mediterranean zones, leave at 0 to use defaults
+    'pas_simple_input': False,          # (kg)(p)alters other options at startup to accommodate only tas and pr inputs
     }
 
 
@@ -1930,8 +1934,9 @@ def Get_input(first=True, fi=[]):
     in_files = fi
     in_opts = {}
     if first:       #only show header and get file input on first run
-        print('''
+        print(f'''
 Koppenpasta climate zones interpreter and mapmaker
+    version {ver_num}
 Script written 2021 by Nikolai Hersfeldt
     of worldbuildingpasta.blogspot.com
 For use with NetCDF output files from ExoPlaSim GCM
@@ -2639,10 +2644,14 @@ def Read_topo(topo_map=None, res=None, maxel=None, minel=None, sealev=None, grav
     hmap = hmap.convert('F')    # Convert to float for precision on downscaling
     hmapext = hmap.getextrema() # Find minimum and maximum before resizing for accurate elevation scaling
     thresh = (sealev - minel) * (hmapext[1] - hmapext[0]) / (maxel - minel) # Find greyscale value corresponding to sea level
-    hmap_bin = Image.fromarray(np.where(np.asarray(hmap) > thresh, 10000, 0))   #convert to array, binarize, then convert back to image
+    hmap_bin_ar = np.where(np.asarray(hmap) > thresh, 100, 0) #convert to array, binarize, then convert back to image
+    try:
+        hmap_bin = Image.fromarray(hmap_bin_ar)
+    except:
+        hmap_bin = Image.fromarray(hmap_bin_ar.astype(np.uint8))    #I dunno why the first version fails for some people, this might help
     hmap_bin = hmap_bin.resize(res, Image.Resampling.BILINEAR)
     topo_bin = np.asarray(hmap_bin)
-    topo_mask = np.where(topo_bin > 5000, True, False)  # re-binarize after downscaling
+    topo_mask = np.where(topo_bin > 50, True, False)  # re-binarize after downscaling
     hmap = hmap.resize(res, Image.Resampling.BILINEAR)
     elev = np.asarray(hmap)
     elev = elev * (maxel - minel) / (hmapext[1] - hmapext[0]) * gravity #scale to geopotential
@@ -2682,7 +2691,7 @@ def Calc_PET(method='asce_pm', tas=None, maxt=None, mint=None, rnet=None, rin=No
         else:
             raise Exception('Calc_PET requires temperature input')
     if method == 'kalike':
-        pet = 0.15 * tas
+        pet = tas * 7 / 30
     elif method == 'hargreaves':
             if rin is None:
                 raise Exception('Calc_PET requires absorbed surface radiation input for hargreaves method')
@@ -2876,8 +2885,10 @@ def Get_nc_if(dat, dat_key, data, data_key=None, coords=None, res=None, single=F
 #   t_unadjust: return temperature data without adjustment applied
 def Get_nc_adjust(dat, t_key, g_key, coords=None, res=None, topo=None, t_unadjust=False):
     t_ar = Get_nc(dat, t_key, coords=coords, res=res)
+    if not res and opt('interp_scale'):
+        res = get_res((t_ar.shape[1],t_ar.shape[2]), scale=opt('interp_scale'))
     if not topo:
-        if opt('topo_map') is None:
+        if not res or opt('topo_map') is None:
             adjust = np.zeros_like(t_ar)    #return zero adjustment if not using topography map
             return t_ar, adjust
         else:
@@ -2893,8 +2904,7 @@ def Get_nc_adjust(dat, t_key, g_key, coords=None, res=None, topo=None, t_unadjus
                     print("  Unable to upload topography map; proceeding without temperature adjustment")
                     adjust = np.zeros_like(t_ar)
                     return t_ar, adjust
-    if not res:
-        res = get_res((t_ar.shape[1],t_ar.shape[2]), scale=opt('interp_scale'))
+            
     g_ar = Get_nc(dat, g_key, single=True, no_interp=True)
     clapse = opt('const_lapse_rate')
     if clapse is not None and clapse > 0:
@@ -3094,6 +3104,10 @@ def Alternate_Data():
 
     tas = (maxt + mint) / 2
 
+    pet = Get_pet(dat,{'tas':tas},'kalike')
+
+    aet = Estimate_evap(pet,ppt)
+
     all_data = dict(
         tas=tas,
         mint=mint,
@@ -3187,8 +3201,8 @@ def Get_params(files, land_funcs, sea_funcs):
             for k, v in data.items():
                 if v.ndim > 2:
                     data[k] = np.mean(v, 0, keepdims=True)
-        if len(files) > 1:
-            print(" Procssing averaged data from all files to climate parameters...")
+        if not opt('force_alt_data') and len(files) > 1:
+            print(" Processing averaged data from all files to climate parameters...")
         else:
             print(" Processing data to climate parameters...")
         params = land_funcs[1](data)
@@ -3594,6 +3608,18 @@ def Save_opts(in_opts=None):
             add_opt({'estimate_evap': 'never'})
     except:
         pass
+
+    if opt('pas_simple_input'):
+        add_opt({
+            'pet_method': 'kalike',
+            'estimate_evap': 'all',
+            'gdd_limit_light': False,
+            'temp_tunings': 'tavg',
+            'sea_use_ts': False,
+            'sea_ice_use_temp': True,
+            'pas_boil_pres': False,
+            'pas_ice_def': 'tavg'
+            })
 
     return
 
@@ -4878,7 +4904,7 @@ Clim_func['WCR'] = (Woodward_Data, Woodward_Param, WCR_Alg)
 def Biome_Data(dat):
 
     tas, adjust = Get_nc_adjust(dat, 'tas', 'grnz', t_unadjust=True)    #get unadjusted tas at first
-    
+
     rss = Get_nc(dat, 'rss')
     ps = Get_nc(dat, 'ps')
 
@@ -4976,17 +5002,20 @@ def Biome_Param(data):
     Max_Avg = np.amax(tas, 0)
     Min_Avg = np.amin(tas, 0)
 
+    Min_Abs = np.minimum(Min_Abs, Min_Avg)  #ensure absolute extremes are always beyond average extremes
+    Max_Abs = np.maximum(Max_Abs, Max_Avg)
+
     ##GDD config
 
     GDDbase = 5     #base temp for GDD (C)
     GDDplats = 25   #'plateau' start; point of maximum GDD
-    GDDplate = 35   #'plateau' end; GDD starts declining again
-    GDDtop = 45     #maximum growth temp
+    GDDplate = 40   #'plateau' end; GDD starts declining again
+    GDDtop = 50     #maximum growth temp
 
     GDDzbase = 0    #values for GDDz
     GDDzplats = 20
-    GDDzplate = 35
-    GDDztop = 55
+    GDDzplate = 40
+    GDDztop = 60
 
     GDDlbase = 10 / opt('gdd_par_ratio')   #values for light-limited GDD maximum (W/m^2)
     GDDlplats = 110 / opt('gdd_par_ratio')  #corresponds to 20 and 220 for sunlike PAR ratio of 0.5
@@ -5309,6 +5338,9 @@ def Pasta_Alg(par):
         th_hot = 40
         th_torrid = 60
         th_boil = 90
+    
+    if opt('pas_med_thresh') > 0:   #override set med thresholds
+        th_XM = opt('pas_med_thresh')
 
     if opt('land_subtype') in ('no_pluv', 'earthlike_no_pluv'):  #disable pluvial zones
         th_XXp = -1
@@ -5651,6 +5683,9 @@ def Unproxied_Alg(par):
         th_cool = 17
         th_cold = 0
         th_frigid = -30
+    
+    if opt('pas_med_thresh') > 0:   #override set med thresholds
+        th_Xs = opt('pas_med_thresh')
     
     if opt('pas_ice_def') in ('ice', 'ice_noadj'):
         ice = par['Min_Ice_Land'] > th_EF
@@ -5995,7 +6030,7 @@ def Pasta_Sea_Data(dat, data):
                 tkey_dat += opt('temp_adjust')    #convert to C and add ajustment
             data[tkey] = tkey_dat
 
-        if opt('sea_subtype') == 'full':
+        if opt('sea_subtype') == 'full' and opt('gdd_limit_light'):
             rss, was_in = Get_nc_if(dat, 'rss', data, 'rin')
             if not was_in:
                 ssru = Get_nc(dat, 'ssru')
@@ -6035,7 +6070,7 @@ def Pasta_Sea_Param(data, par):
         par['Min_Seatemp'] = np.amin(ts, axis=0)
         par['Max_Seatemp'] = np.amax(ts, axis=0)
 
-        if opt('sea_subtype') == 'full':
+        if opt('sea_subtype') == 'full' and opt('gdd_limit_light'):
             if 'GDDlz' not in data:
                 rin = data['rin']
                 GDDlz = Calc_GDD(rin, base=GDDlzbase, plat_start=GDDlzplats) / 10
@@ -6062,7 +6097,7 @@ def Pasta_Sea_Alg(par):
     else:
         Max_Ice = np.where(Min_Seatemp < -2, 1, 0)
         Min_Ice = np.where(Max_Seatemp < -2, 1, 0)
-    if opt('sea_subtype') == 'full':
+    if opt('sea_subtype') == 'full' and opt('gdd_limit_light'):
         GDDlz = par['GDDlz']
     else:
         GDDlz = 10000
