@@ -101,7 +101,7 @@ Made 2022 by Nikolai Hersfeldt
     infile = ""
     while infile != "stop":
         infile = path+input('Input NetCDF filename or folder of files ("stop" for no more inputs): ')
-        if infile in "stop":
+        if "stop" in infile or "STOP" in infile:
             print("")
             break
         elif os.path.exists(infile):
