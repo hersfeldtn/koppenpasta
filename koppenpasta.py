@@ -8,7 +8,7 @@ import configparser
 from PIL import Image, ImageFont, ImageDraw
 import os
 
-ver_num = "2.0.2"
+ver_num = "2.1.0"
 
 ### GUIDANCE
 
@@ -23,7 +23,7 @@ ver_num = "2.0.2"
 # Set 'land_type' in the options below to desired key to make it the default
 # (or try adding it to the input options if you feel ambitious)
 
-##Contents (rough positions as of 2.0):
+##Contents (rough positions as of 2.0, bit outdated now):
 # Options:                      76
 # Climate Zones:                177
 #   Color Dictionaries:         548
@@ -97,6 +97,7 @@ option_def = {
     'seasonless': False,                # average all data across time before finding zones
     'blend': True,                      # blend land and sea maps based on land mask
     'bin_months': 0,                    # reduce input months by binning sequential months together
+    'bin_preserve_ext': True,           # preserve extremes of maximum and minimum temperature when binning months
     'month_length': 1,                  # length of month relative to Earth for GDD calculations
 
     #interpolation
@@ -127,6 +128,7 @@ option_def = {
     'force_alt_data': False,            # force use of Alternate_Data function instead of climate-specific _Data function
     'temp_adjust': -273.15,             # factor to add for all temperature adjustments (-273.15 to convert from K to C)
     'precip_adjust': 2592000000,        # factor to multiply by for all precipitation-related adjustments (2592000000 to convert from m/s to mm/month)
+    'verbose': False,                   # print additional information to command line during run
 
     #options used for all PET calculations (used for holdridge, prentice, pasta, and unproxied KG)
     'pet_method': 'asce-pm',            # method to calculate PET
@@ -164,6 +166,7 @@ option_def = {
     'kg_arid_polar_priority': 'arid',   # (t)priority of arid and polar regions
     'kg_trewartha_arid': False,         # use Trewartha arid threshold formula
     'kg_trewartha_seasons': False,      # use Trewartha Xs/Xw definitions
+    'kg_med_as': False,                 # (t)define As zones like Cs/Ds zones, rather than just based on having more than half total rain in winter
 
     #holdridge options
     'h_no_pet': False,                  # index zones by precipitation and biotemperature only, with no PET input
@@ -173,6 +176,7 @@ option_def = {
     'pas_boil_pres': True,              # calculate boiling point from surface pressure, rather than using constant 100 C
     'pas_ice_def': 'ice',               # (kg)parameter for defining ice cover, for land and sea
     'pas_med_thresh': 0,                # (kg)forces alternate GrS threshold for Mediterranean zones, leave at 0 to use defaults
+    'pas_gint_thresh': 1250,            # (kg)threshold of GInt for both stopping GDD accumulation and 
     'pas_simple_input': False,          # (kg)(p)alters other options at startup to accommodate only tas and pr inputs
     }
 
@@ -1173,113 +1177,113 @@ pasta_earthlike_color = {   #wip, will implement later
 }
 
 pasta_true_color = {    #also wip, just copied above as placeholder
-    TUr: [0,0,255],
-    TUrp: [4,0,191],
-    TUf: [41,112,255],
-    TUfp: [26,80,188],
-    TUs: [115,170,242],
-    TUsp: [97,137,189],
-    TUA: [168,194,255],
-    TUAp: [140,162,212],
-    TQf: [0,0,0],
-    TQfp: [0,0,0],
-    TQs: [0,0,0],
-    TQsp: [0,0,0],
-    TQA: [0,0,0],
-    TQAp: [0,0,0],
-    TF: [0,0,0],
-    TG: [0,0,0],
-    CTf: [128,0,255],
-    CTfp: [99,0,199],
-    CTs: [181,115,247],
-    CTsp: [126,79,173],
-    CDa: [14,251,93],
-    CDap: [0,194,65],
-    CDb: [112,240,186],
-    CDbp: [54,171,120],
-    CEa: [55,210,192],
-    CEap: [48,141,130],
-    CEb: [65,251,251],
-    CEbp: [4,182,185],
-    CEc: [225,0,255],
-    CEcp: [158,0,179],
-    CMa: [253,157,30],
-    CMb: [177,137,27],
-    CAMa: [251,255,0],
-    CAMb: [162,172,27],
-    CAa: [255,0,123],
-    CAap: [178,31,102],
-    CAb: [255,66,66],
-    CAbp: [199,0,0],
-    CFa: [186,253,245],
-    CFb: [180,188,192],
-    CG: [153,153,153],
-    CI: [94,94,94],
-    HTf: [0,0,0],
-    HTfp: [0,0,0],
-    HTs: [0,0,0],
-    HTsp: [0,0,0],
-    HDa: [0,0,0],
-    HDap: [0,0,0],
-    HDb: [0,0,0],
-    HDbp: [0,0,0],
-    HDc: [0,0,0],
-    HDcp: [0,0,0],
-    HMa: [0,0,0],
-    HMb: [0,0,0],
-    HMc: [0,0,0],
-    HAMa: [0,0,0],
-    HAMb: [0,0,0],
-    HAMc: [0,0,0],
-    HAa: [0,0,0],
-    HAap: [0,0,0],
-    HAb: [0,0,0],
-    HAbp: [0,0,0],
-    HAc: [0,0,0],
-    HAcp: [0,0,0],
-    HFa: [0,0,0],
-    HFb: [0,0,0],
-    HFc: [0,0,0],
-    HG: [0,0,0],
-    ETf: [0,0,0],
-    ETfp: [0,0,0],
-    ETs: [0,0,0],
-    ETsp: [0,0,0],
-    EDa: [0,0,0],
-    EDap: [0,0,0],
-    EDb: [0,0,0],
-    EDbp: [0,0,0],
-    EMa: [0,0,0],
-    EMb: [0,0,0],
-    EAMa: [0,0,0],
-    EAMb: [0,0,0],
-    EAa: [0,0,0],
-    EAap: [0,0,0],
-    EAb: [0,0,0],
-    EAbp: [0,0,0],
-    EFa: [0,0,0],
-    EFb: [0,0,0],
-    EG: [0,0,0],
-    Ada: [232,230,162],
-    Aha: [255,251,204],
-    Adc: [161,184,132],
-    Ahc: [214,238,191],
-    Adh: [0,0,0],
-    Ahh: [0,0,0],
-    Ade: [0,0,0],
-    Ahe: [0,0,0]
+    TUr: [41,63,13],
+    TUrp: [42,65,16],
+    TUf: [55,74,20],
+    TUfp: [59,80,24],
+    TUs: [75,85,33],
+    TUsp: [89,102,47],
+    TUA: [107,105,53],
+    TUAp: [124,116,63],
+    TQf: [59,78,23],
+    TQfp: [54,73,24],
+    TQs: [75,80,35],
+    TQsp: [67,76,30],
+    TQA: [107,105,53],
+    TQAp: [124,116,63],
+    TF: [78,84,66],
+    TG: [98,91,59],
+    CTf: [59,78,23],
+    CTfp: [54,73,24],
+    CTs: [75,80,35],
+    CTsp: [67,76,30],
+    CDa: [60,78,23],
+    CDap: [36,54,15],
+    CDb: [55,75,21],
+    CDbp: [38,62,11],
+    CEa: [60,63,29],
+    CEap: [38,52,18],
+    CEb: [49,61,18],
+    CEbp: [52,64,25],
+    CEc: [62,71,24],
+    CEcp: [64,74,27],
+    CMa: [60,73,26],
+    CMb: [51,63,22],
+    CAMa: [103,97,54],
+    CAMb: [118,108,68],
+    CAa: [105,98,58],
+    CAap: [58,68,25],
+    CAb: [102,100,55],
+    CAbp: [94,87,55],
+    CFa: [78,84,66],
+    CFb: [93,88,54],
+    CG: [98,91,59],
+    CI: [240,240,240],
+    HTf: [55,74,20],
+    HTfp: [59,80,24],
+    HTs: [75,85,33],
+    HTsp: [89,102,47],
+    HDa: [60,78,23],
+    HDap: [36,54,15],
+    HDb: [55,75,21],
+    HDbp: [38,62,11],
+    HDc: [62,71,24],
+    HDcp: [64,74,27],
+    HMa: [60,73,26],
+    HMb: [51,63,22],
+    HMc: [51,63,22],
+    HAMa: [103,97,54],
+    HAMb: [118,108,68],
+    HAMc: [118,108,68],
+    HAa: [107,105,53],
+    HAap: [124,116,63],
+    HAb: [107,105,53],
+    HAbp: [124,116,63],
+    HAc: [107,105,53],
+    HAcp: [124,116,63],
+    HFa: [78,84,66],
+    HFb: [93,88,54],
+    HFc: [93,88,54],
+    HG: [98,91,59],
+    ETf: [59,78,23],
+    ETfp: [54,73,24],
+    ETs: [75,80,35],
+    ETsp: [67,76,30],
+    EDa: [60,78,23],
+    EDap: [36,54,15],
+    EDb: [55,75,21],
+    EDbp: [38,62,11],
+    EMa: [60,73,26],
+    EMb: [51,63,22],
+    EAMa: [103,97,54],
+    EAMb: [118,108,68],
+    EAa: [105,98,58],
+    EAap: [58,68,25],
+    EAb: [102,100,55],
+    EAbp: [94,87,55],
+    EFa: [78,84,66],
+    EFb: [93,88,54],
+    EG: [98,91,59],
+    Ada: [167,137,95],
+    Aha: [238,210,156],
+    Adc: [177,153,110],
+    Ahc: [208,181,141],
+    Adh: [167,137,95],
+    Ahh: [238,210,156],
+    Ade: [177,153,110],
+    Ahe: [208,181,141]
 }
 
 pastaocean_true_color = {
-    Ofi: [190,208,226],
-    Ofd: [20,30,66],
-    Ofg: [20,30,66],
-    Og: [20,30,66],
-    Oc: [20,30,66],
-    Ot: [20,30,66],
-    Oh: [20,30,66],
-    Or: [20,30,66],
-    Oe: [20,30,66]
+    Ofi: [240,240,240],
+    Ofd: [10,10,51],
+    Ofg: [10,10,51],
+    Og: [10,10,51],
+    Oc: [10,10,51],
+    Ot: [10,10,51],
+    Oh: [10,10,51],
+    Or: [10,10,51],
+    Oe: [10,10,51]
     }
 
 ### CLIMATE ZONE NAMES
@@ -1596,7 +1600,7 @@ name_key = {
     EAb:  'EAb: Hyperseasonal Steppe',
     EAbp: 'EAbp: Hyperseasonal Pluvial Steppe',
     EFa:  'EFa: Superseasonal Pulse',
-    EFb:  'EDb: Hyperseasonal Pulse',
+    EFb:  'EFb: Hyperseasonal Pulse',
     EG:   'EG: Extraseasonal Barren',
     Ada:  'Ada: Warm Semidesert',
     Aha:  'Aha: Warm Desert',
@@ -1816,6 +1820,7 @@ def add_opt(option):
 
 def add_common(key, data):
     kpasta_common[key] = data
+    verb(f'    Saved {key} to common data')
 
 def reset_default():
     global kpasta_common
@@ -1830,6 +1835,12 @@ path = os.path.join(os.path.dirname(__file__), '')
 
 #Dictionary of climate functions, to be filled in later
 Clim_func = {}
+
+#Function for verbose output, just to save the extra line
+def verb(rep):
+    if opt('verbose'):
+        print(rep)
+    return
 
 ## Input
 
@@ -1884,28 +1895,50 @@ def Load_options(cfg_file, opt_lo={}, opt_hi={}):
 #Find .nc files in path, returning list of files
 # if path is a .nc file, list contains that single file
 # if path is folder, finds every .nc file in folder or subdirectories
-def File_search(path):
+def File_search(fpath):
     files = []
-    if os.path.exists(path):
-        if os.path.isdir(path):
-            for p, n, fs in os.walk(path):
+    if os.path.exists(fpath):
+        if os.path.isdir(fpath):
+            for p, n, fs in os.walk(fpath):
                 for f in fs:
                     if f.endswith(".nc"):
                         n_f = os.path.join(p, f)
                         files.append(n_f)
                         print(" Found "+str(n_f))
             if files:
-                print(" Found all .nc files in "+path)
+                print(" Found all .nc files in "+fpath)
             else:
-                print(" No .nc files found in "+str(path))
+                print(" No .nc files found in "+str(fpath))
         else:
-            if path.endswith(".nc"):
+            if fpath.endswith(".nc"):
                 print(" File found")
-                files.append(path)
+                files.append(fpath)
             else:
-                print(f" Error: {path} is not .nc file")
+                print(f" Error: {fpath} is not .nc file")
     else:
-        print(" No file found at "+str(path))
+        print(" No file found at "+str(fpath))
+    return files
+
+#Wrapper for File_search() that checks for snapshots and adds warning
+def Prompt_files(fpath):
+    files = File_search(fpath)
+    files2 = []
+    snaps = []
+    for f in files:
+        if 'SNAP' in f:
+            snaps.append(f)
+        else:
+            files2.append(f)
+    if len(snaps) > 0:
+        print('''
+WARNING: input appears to include snapshot files:''')
+        for s in snaps:
+            print(s)
+        if not Prompt_bool('''Snapshot files record data at a specific point in time,
+    not as an average across whole months,
+    and so are unsuitable for climate classification purposes
+Include these files? (any other files will still be included) (y/n): '''):
+            files = files2
     return files
 
 #Prompts with string and returns True if input contains y, Y, or 1
@@ -1945,7 +1978,7 @@ For use with NetCDF output files from ExoPlaSim GCM
 
         #ask for input file
         while not in_files:
-            in_files = File_search(path+input('Input NetCDF filename or folder of files: '))
+            in_files = Prompt_files(path+input('Input NetCDF filename or folder of files: '))
 
         #Prompts for configuration
         if not Prompt_bool('Advanced setup? (y/n): '):
@@ -1961,7 +1994,7 @@ Add additional inputs? (y/n): '''):
                 if nextin == ('stop') or nextin == ('STOP'):
                     break
                 else:
-                    in_files.append(File_search(path+nextin))
+                    in_files.append(Prompt_files(path+nextin))
 
     if Prompt_bool('''
 Load alternative config file? (y/n): '''):
@@ -2105,7 +2138,7 @@ Pasta Subtype
 2: Earthlike-only: exclude Hot (H) zone, Extraseasonal (E) zones, and their arid counterparts,
     and ignore light limitations
 3: As above, but exclude pluvial (Xxp) zones as well
-'''),
+Set climate zone subtype: '''),
             ('full',
             'no_pluv',
             'earthlike',
@@ -2122,15 +2155,12 @@ Set Land colors: ''')
         else:
             color_prompt = ('''
 Pasta Colors
-0: Default colors'''+
-#1: "True" color; fills each zone with their average color on Earth, based on satellite imagery         #will implement later
-#    (or that of nearest analogue on Earth)
-                '''
-1: Import custom color list (see defaultcolor.ini for template)
+0: Default colors
+1: "True" color; fills each zone with their average color on Earth, based on satellite imagery
+    (or that of nearest analogue on Earth)
+2: Import custom color list (see defaultcolor.ini for template)
 Set Land colors: ''') 
             color_opts = ('standard', 'true', 'file')
-        color_prompt += ('''
-Set Land colors: ''')
         
     else:
         color_prompt = ('''
@@ -2184,18 +2214,18 @@ Pasta Sea Subtype
 0: Full set of 10 sea zones
 1: Earthlike-only: exclude dark (Ofg,Og), hot (Oh,Or), and extraseasonal (Oe) seas
 2: As above, but also exclude tropical (Ot) seas, showing ice cover only
-Set sea subtype'''),
+Set sea subtype: '''),
             ('full',
             'earthlike',
             'no_trop'))
         color_prompt = ('''
 Pasta Sea Colors
-0: Default shaded blue colors''' +
-#1: "True" color; based on satellite imagery, dark blue seas and blue-tinged white for Ofi      #will implement later
-            '''
-1: ''')
+0: Default shaded blue colors
+1: "True" color; based on satellite imagery, dark blue seas and white Ofi
+2: ''')
         color_opts = ('standard',
-            'file')
+                      'true',
+                      'file')
     elif sea_choice == 'none':
         in_opts['sea_type'] = ('sea_none')
         in_opts['sea_subtype'] == ('none')
@@ -2252,7 +2282,7 @@ File Combination Method
 1: Average parameters: determine parameters separately for each file, then average these results together;
     slower, but better if seasonal timing may vary significantly between files.
 2: Sequential: treat files as portions of one long year, linking data from each in order of input
-'''),
+Set combination method: '''),
             ('data',
             'param',
             'seq'))
@@ -2293,6 +2323,14 @@ If using sequential file combination, binning is applied afterwards to combined 
     but in all cases is applied before determining climate parameters
 For an input of "1" or "0" the script will not bin months together.
 Set bin size: '''))
+    if in_opts['bin_months'] > 1 and in_opts['land_type'] in ('Woodward','Prentice','Pasta','KG_unproxied'):
+        in_opts['bin_preserve_ext'] = Prompt_bool('''
+Binning of Temperature Extremes
+By default, max temperature in each bin is maximum of the binned months
+    and min temerature is the minimum
+    rather than averages, as used for most parameters.
+But can choose to average these instead.
+Average rather than preserve temperature extremes? (y/n): ''')
     
     in_opts['interp_scale'] = float(input('''
 Interpolation Rescaling Factor
@@ -2431,15 +2469,36 @@ Setup Complete
 #Average sequential months together into bins
 #   data: data array
 #   nbin: number of months to bin together
-def Bin_months(data, nbin):
+#   ext: -1 for min, 0 for average, 1 for max
+def Bin_months(data, nbin, ext=0):
+    if not opt('bin_preserve_ext'):
+        ext = 0
     d_shape = data.shape
     n_t = math.ceil(d_shape[0]/nbin)
     n_data = np.empty((n_t,d_shape[1],d_shape[2]), dtype=data.dtype)
-    for n in range(n_t):
-        if (n+1)*nbin > d_shape[0]:
-            n_data[n,:,:] = (np.sum(data[n*nbin:,:,:], 0) + np.sum(data[:n*nbin+nbin-d_shape[0],:,:], 0))/nbin    #if there aren't enough months to fill last bin, loop around to start of year
-        else:
-            n_data[n,:,:] = np.mean(data[n*nbin:(n+1)*nbin,:,:], 0)
+    if ext > 0:     #find maximum in each bin
+        verb('     Binning by averaging data')
+        for n in range(n_t):
+            if (n+1)*nbin > d_shape[0]:
+                n_data[n,:,:] = np.maximum(np.amax(data[n*nbin:,:,:], 0), np.amax(data[:n*nbin+nbin-d_shape[0],:,:], 0))    #if there aren't enough months to fill last bin, loop around to start of year
+            else:
+                n_data[n,:,:] = np.amax(data[n*nbin:(n+1)*nbin,:,:], 0)
+
+    elif ext < 0:   #find minimum in each bin
+        verb('     Binning by finding minimum')
+        for n in range(n_t):
+            if (n+1)*nbin > d_shape[0]:
+                n_data[n,:,:] = np.minimum(np.amin(data[n*nbin:,:,:], 0), np.amin(data[:n*nbin+nbin-d_shape[0],:,:], 0))
+            else:
+                n_data[n,:,:] = np.amin(data[n*nbin:(n+1)*nbin,:,:], 0)
+
+    else:           #find average in each bin
+        verb('     Binning by finding maximum')
+        for n in range(n_t):
+            if (n+1)*nbin > d_shape[0]:
+                n_data[n,:,:] = (np.sum(data[n*nbin:,:,:], 0) + np.sum(data[:n*nbin+nbin-d_shape[0],:,:], 0))/nbin
+            else:
+                n_data[n,:,:] = np.mean(data[n*nbin:(n+1)*nbin,:,:], 0)
     return n_data
 
 #Calculate appropriate target resolution from interp scale and input resolution
@@ -2451,8 +2510,11 @@ def make_res(in_res, scale=None):
             print('  No interpolation scale provided to make_res, returning input scale')
             return in_res
     if isinstance(scale, tuple):
-        return (scale[1],scale[0])  #switch from x,y to lat,lon
-    return (round(in_res[0] * scale), round(in_res[1] * scale))
+        scale_out = (scale[1],scale[0])  #switch from x,y to lat,lon
+    else:
+        scale_out = (round(in_res[0] * scale), round(in_res[1] * scale))
+    verb(f'   Calculated output resolution as {scale_out}')
+    return scale_out
 
 #Check if res has already been made, and if not make it, returning res either way
 def get_res(in_res, scale=None):
@@ -2478,9 +2540,11 @@ def get_coords(shape, big=False, startlon=0):
         lat = np.linspace(math.pi/2 - math.pi/(2*shape[0]), -math.pi/2 + math.pi/(2*shape[0]), shape[0])
         lon = np.linspace(startlon + math.pi/shape[1], startlon + 2*math.pi - math.pi/shape[1], shape[1])
         if big:
+            verb('   Calculated lat and lon arrays at output resolution')
             add_common('lat_big', lat)
             add_common('lon_big', lon)
         else:
+            verb('   Calculated lat and lon arrays')
             add_common('lat', lat)
             add_common('lon', lon)
     return lat, lon
@@ -2491,8 +2555,9 @@ def coords_from_file(dat, latkey, lonkey, deg=True):
         lat = common('lat')
         lon = common('lon')
     except:
-        lat = dat[0][latkey][:]
-        lon = dat[0][lonkey][:]
+        verb('    Extracting lat and lon arrays from file')
+        lat = dat[latkey][:]
+        lon = dat[lonkey][:]
         if deg:
             lat *= math.pi/180
             lon *= math.pi/180
@@ -2508,6 +2573,7 @@ def coords_from_file(dat, latkey, lonkey, deg=True):
 #   mask: land/sea mask for dummy ice
 #   dummy_ice: add dummy sea ice
 def Interp(data, res=None, interp_type=None, coords_in=None, coords_out=None, mask=None, dummy_ice=False):
+    verb('     Interpolating data')
     squeeze_at_end = False
     if data.ndim < 3:
         data = np.expand_dims(data, 0)  #add time axis to 2d array so that later functions can assume it
@@ -2534,12 +2600,16 @@ def Interp(data, res=None, interp_type=None, coords_in=None, coords_out=None, ma
     lon_out = lon_out.ravel()
     
     if dummy_ice:
+        verb('     Applying dummy sea ice for interpolation')
+        go = True
         if not mask:
             try:
                 mask = get_mask
-                data = np.where(mask, max_filter(data, (0,3,3), mode=('constant','wrap','nearest'), cval=1.0), data)   #apply dummy ice to land areas by copying max of neighboring sea ice values
             except:
                 print('  No land/sea mask provided to interp function; not applying dummy sea ice')
+                go = False
+        if go:
+            data = np.where(mask, max_filter(data, (0,3,3), mode=('constant','wrap','nearest'), cval=1.0), data)   #apply dummy ice to land areas by copying max of neighboring sea ice values
     n_data = np.empty((d_shape[0],res[0],res[1]))
     if interp_type == 'spline':
         for t in range(d_shape[0]):
@@ -2588,6 +2658,7 @@ def stack_neighbors(ar):
 #   data: temperature data
 #   elev: model elevation data
 def Find_lapse(data, elev):
+    verb('    Finding elevation differences between cells')
     elev_stack = stack_neighbors(elev)
     elev = np.broadcast_to(elev, elev_stack.shape)
     exclude = np.full_like(elev, False)     #exclude cases with cells rolled around the top and bottom of the map
@@ -2604,10 +2675,11 @@ def Find_lapse(data, elev):
     has_stack = np.where(exclude, 0, has_stack)     #excludes polar wrapping again
     has_sum = np.sum(has_stack, 0)
     all_lapse = np.zeros_like(data)
+    verb('    Finding empirical lapse rates in each timestep')
     for t in range(data.shape[0]):
         dat_stack = stack_neighbors(data[t,:,:])
         dat = np.broadcast_to(data[t,:,:], dat_stack.shape)
-        lapse = np.where(thresh, (dat_stack-dat)/dif, 0)
+        lapse = np.where(thresh, (dat_stack-dat)/np.where(thresh,dif,1), 0) #double-check thresh just to avoid div/0 warnings
         lapse = np.sum(lapse, 0)
         lapse = lapse/np.maximum(thresh_sum, 1)     #find average lapse rate in each cell while avoiding div/0 errors.
         lapse_av = np.sum(lapse)/np.sum(has_lapse)   #find average lapse rate for all cells with reported values
@@ -2640,21 +2712,26 @@ def Read_topo(topo_map=None, res=None, maxel=None, minel=None, sealev=None, grav
         gravity = opt('gravity')
 
     res = (res[1],res[0])
+    verb('     Reading map image')
     hmap = Image.open(topo_map)
     hmap = hmap.convert('F')    # Convert to float for precision on downscaling
     hmapext = hmap.getextrema() # Find minimum and maximum before resizing for accurate elevation scaling
+    verb('    Extracting land/sea mask from topo map')
     thresh = (sealev - minel) * (hmapext[1] - hmapext[0]) / (maxel - minel) # Find greyscale value corresponding to sea level
     hmap_bin_ar = np.where(np.asarray(hmap) > thresh, 100, 0) #convert to array, binarize, then convert back to image
     try:
         hmap_bin = Image.fromarray(hmap_bin_ar)
     except:
+        verb('     First attempt to convert mask array back to image failed, attempting to read as uint8')
         hmap_bin = Image.fromarray(hmap_bin_ar.astype(np.uint8))    #I dunno why the first version fails for some people, this might help
     hmap_bin = hmap_bin.resize(res, Image.Resampling.BILINEAR)
     topo_bin = np.asarray(hmap_bin)
     topo_mask = np.where(topo_bin > 50, True, False)  # re-binarize after downscaling
+    verb('     Resampling and scaling topo elevation')
     hmap = hmap.resize(res, Image.Resampling.BILINEAR)
     elev = np.asarray(hmap)
     elev = elev * (maxel - minel) / (hmapext[1] - hmapext[0]) * gravity #scale to geopotential
+    verb(f'     Topo elevation map produced with geopotential range of {np.amin(elev)} to {np.amax(elev)}')
     return elev, topo_mask
 
 #Calculate potential evapotranspiration
@@ -2685,6 +2762,7 @@ def Read_topo(topo_map=None, res=None, maxel=None, minel=None, sealev=None, grav
 #   vegf: surface forest cover
 #       if absent, assume constant of 0.5
 def Calc_PET(method='asce_pm', tas=None, maxt=None, mint=None, rnet=None, rin=None, hur=None, ps=None, elev=None, wind=None, tsoil=None, vegf=None):
+    verb('    Calculating PET')
     if tas is None:
         if not (maxt is None or mint is None):
             tas = maxt + mint / 2
@@ -2704,12 +2782,15 @@ def Calc_PET(method='asce_pm', tas=None, maxt=None, mint=None, rnet=None, rin=No
         if hur is None:
             raise Exception('Calc_PET requires relative humidity input for asce_pm method')
         if ps is None:
+            verb('     No surface pressure found in Calc_PET, using backup')
             ps = opt('pet_backup_ps')
             if elev is not None:
                 ps *= ((293 - 0.0065*elev) / 293)**5.26     #backup options for surface pressure; probably don't work amazingly
         if wind is None:
+            verb('     No wind found in Calc_PET, using backup')
             wind = opt('pet_backup_wind')    #simple placeholder just to not make this an absolute requirement
         if tsoil is None:
+            verb('     No soil temperature found in Calc_PET, assuming constant')
             gsoil = 0
         else:
             gsoil = 0.07 *(np.roll(tsoil, 1, 0) - np.roll(tsoil, 1, 0))     #estimate net heat flux to soil by soil temperature change
@@ -2735,11 +2816,13 @@ def Calc_PET(method='asce_pm', tas=None, maxt=None, mint=None, rnet=None, rin=No
             esmin = 0.6108 * np.exp(17.27 * mint / (mint + 237.3))
             esav = (esmax + esmin)/2
         else:
+            verb('     No daily maxt and mint found in Calc_PET, ignoring diurnal temp variation')
             esav = es    #average saturation pressure, kPa
         ea = esav * hur / 100      #actual vapor pressure, kPa
         de = es - ea    #vapor pressure deficit, kPa
         if method == 'asce-pm': #may add option for more regular pm, which excludes this
             if vegf is None:    #if no vegetation input, split the difference
+                verb('     No vegetation found in Calc_PET, using backup')
                 vegf = 0.5
             cn = (900 + 500 * vegf)     #interpolate between tall and short reference vegetation based on forest cover
             cd = (0.34 + 0.04 * vegf)
@@ -2762,6 +2845,7 @@ def Calc_PET(method='asce_pm', tas=None, maxt=None, mint=None, rnet=None, rin=No
 #   comp: compensation temperature; zero GDD above this temp
 #       with linear GDD-temp relation between plat_end and comp
 def Calc_GDD(tas, base=5, plat_start=30, plat_end=10000, comp=20000):
+    verb('     Calculating monthly GDD')
     GDD_max = plat_start - base
     back_slope = GDD_max / (comp - plat_end)
 
@@ -2774,38 +2858,63 @@ def Calc_GDD(tas, base=5, plat_start=30, plat_end=10000, comp=20000):
 
     return GDD
 
-#Calculate total gdd for year
+#Calculate total gdd for year, and optionally totally gint
+#   gint: options growth interruption
 #   cont: count longest contiguous accumulation of GDD, rather than simple total
 #   inf: where all months have GDD, set total to 1 million, treating total as effectively infinite
-def Calc_GDD_total(gdd, cont=None, inf=None):
+# full procedure works through 3 loops, each going through year twice (so accumulation carries from last month to first)
+# first, GInt is accumulated forward, adding each month to the total but interrupted where GInt falls to 0
+# then, the resulting totals are propogated backwards in the GInt count,
+#  such that every month in each contiguous interruption period shows the total GInt accumulation for that period
+# then, GDD is accumulated forward, interrupted only where GDD falls to zero during a period of sufficiently great GInt accumulation
+def Calc_GDD_total(gdd, gint=None, cont=None, inf=None, th_gi=1250):
+    verb('     Calculating total GDD count')
     if cont is None:
         cont = opt('gdd_require_contiguous')
     if inf is None:
         inf = opt('gdd_indicate_inf')
-    if cont:   #check for largest contiguous accumulation of gdd rather than total
-        tcur = np.zeros_like(gdd[0,:,:])
-        tmax = tcur.copy()
-        tfirst = tcur.copy()
-        for t in range(len(gdd)):
-            mgdd = gdd[t,:,:] #gdd in current month
-            sumend = np.where(mgdd < 0.001, True, False)   #indicates where the growing season has ended
-            tcur = np.where(sumend, 0, tcur + mgdd) #add to accumulated total or reset
-            tmax = np.maximum(tmax, tcur)   #update maximum total
-            tfirst = np.where(sumend,np.where(tfirst < 0.001, tmax, tfirst),tfirst)  #add tmax where growing has ended for the first time
-        tfirst = np.where(gdd[0,:,:] < 0.001, 0, tfirst)  #restrict to cases where growing was ongoing at first month
-        tmax = np.maximum(tmax, np.where(tcur > 0.001, tcur + tfirst, 0))    #where growing season wraps around year, add together and update maximum total
-        gdd_tot = tmax
+    if cont and len(gdd) > 1:   #check for largest contiguous accumulation of gdd rather than total; skip if seasonless
+        if gint is None:
+            gint_acc = np.ones_like(gdd) * 1e6  #set high so that it's always high enough to interrupt GDD
+        else:
+            gint_acc = np.copy(gint)
+            for i in range(2):  #loop through year twice so last month loops into first
+                for t in range(len(gint)):
+                    gint_acc[t,:,:] = np.where(gint[t,:,:] > 0, gint[t,:,:] + gint_acc[t-1,:,:], 0)    #accumulate gint forward
+            if inf:
+                gint_acc[-1,:,:] = np.where(np.amin(gint_acc,0) > 0, 1e6, gint_acc[-1,:,:]) #set last month to 1 million to show effective infinity
+            for i in range(2):
+                for t in range(len(gint)):
+                    tn = len(gint) - (t+1)
+                    gint_acc[tn-1,:,:] = np.where(np.minimum(gint[tn,:,:],gint[tn-1,:,:]) > 0, gint_acc[tn,:,:], gint_acc[tn-1,:,:])    #propogate total of each gint period backwards to rest of period
+            gint_tot = np.amax(gint_acc, 0)
+        gdd_acc = np.copy(gdd)
+        for i in range(2):
+            for t in range(len(gdd)):
+                gdd_n = gdd[t,:,:] + gdd_acc[t-1,:,:]
+                gdd_acc[t,:,:] = np.where(gdd[t,:,:] > 0, gdd_n, np.where(gint_acc[t,:,:] > th_gi, 0, gdd_n))   #accumulate gdd forward, interrupting only in large gint periods
+        gdd_tot = np.amax(gdd_acc, 0)
+
     else:
         gdd_tot = np.sum(gdd, 0)    #otherwise just sum total
+        gdd_acc = gdd   # for below inf check
+        if gint is not None:
+            gint_tot = np.sum(gint, 0)
+            if inf:
+                gint_tot = np.where(np.amin(gint,0) > 0, 1e6, gint_tot)
     if inf:
-        gdd_tot = np.where(np.amin(gdd,0) > 0.001, 1e6, gdd_tot)  #where there is growing in all months, set gdd to 1 million to indicate effective infinity
-    return gdd_tot
+        gdd_tot = np.where(np.amin(gdd_acc,0) > 0, 1e6, gdd_tot)  #where there is growing in all months, set gdd to 1 million to indicate effective infinity
+    if gint is None:
+        return gdd_tot
+    else:
+        return gdd_tot, gint_tot
 
 #Estimate evaporation from precipitation and PET using simple soil water model
 # returns monthly evaporation in mm/month
 #   pet: total monthly potential evapotranspiration in mm/month
 #   pr: total monthly precipitation in mm/month
 def Estimate_evap(pet, pr):
+    verb('    Estimating evapotranspiration from PET and precipitation')
     evap = np.zeros_like(pet)   #evaporation
     soilw = np.zeros_like(pet)  #soil water at end of each month
     diff = np.zeros_like(pet[0,:,:]) + 1000     #difference in soil water between first and final states
@@ -2829,7 +2938,9 @@ def Estimate_evap(pet, pr):
 #   adjust: adjustment map to be applied to data (for e.g. temp adjustment by topography)
 #   dummy_ice: use dummy_ice option for interpolation
 #   low: pick last atmospheric layer in (time, layer, lat, lon) array, i.e. near-surface layer in eps output
-def Get_nc(dat, key, coords=None, res=None, single=False, no_interp=False, adjust=None, dummy_ice=False, low=False):
+#   bin_ext: ext option for bin (-1 min, 0 avg, 1 max)
+def Get_nc(dat, key, coords=None, res=None, single=False, no_interp=False, adjust=None, dummy_ice=False, low=False, bin_ext=0):
+    verb(f'    Extracting {key}')
     if single:
         try:
             if low:
@@ -2857,24 +2968,27 @@ def Get_nc(dat, key, coords=None, res=None, single=False, no_interp=False, adjus
             else:
                 dat_ar = d_ar
         dat_ar /= len(dat)  #sum values from all input files and then divide by file number to average
+    if opt('bin_months') > 1 and not single:
+        verb('     Binning data')
+        dat_ar = Bin_months(dat_ar, opt('bin_months'), ext=bin_ext)
     if opt('interp_scale') and not no_interp:
         dat_ar = Interp(dat_ar, interp_type=opt('interp_type'), coords_in=coords, res=res, dummy_ice=dummy_ice)
     if adjust is not None:
+        verb('     Applying adjustment')
         dat_ar += adjust
-    if opt('bin_months') > 1 and not single:
-        dat_ar = Bin_months(dat_ar, opt('bin_months'))
     return dat_ar
 
 #If data_key already in data, return from data, otherwise get from data key
 # also returns whether key was in data
 # useful for sea functions, to avoid redundant work pulling data used for both land and sea
-def Get_nc_if(dat, dat_key, data, data_key=None, coords=None, res=None, single=False, no_interp=False, adjust=None, dummy_ice=False, low=False):
+def Get_nc_if(dat, dat_key, data, data_key=None, coords=None, res=None, single=False, no_interp=False, adjust=None, dummy_ice=False, low=False, bin_ext=0):
     if not data_key:
         data_key = dat_key
     if data_key in data:
+        verb(f'    {data_key} already extracted')
         return data[data_key], True
     else:
-        return Get_nc(dat, dat_key, coords=coords, res=res, single=single, no_interp=no_interp, adjust=adjust, dummy_ice=dummy_ice, low=low), False
+        return Get_nc(dat, dat_key, coords=coords, res=res, single=single, no_interp=no_interp, adjust=adjust, dummy_ice=dummy_ice, low=low, bin_ext=bin_ext), False
 
 #Use temperature, file elevation, and full-resolution topography to create temperature adjustment map
 # returns both the processed temp array and the adjustment map array, without adding them
@@ -2883,8 +2997,8 @@ def Get_nc_if(dat, dat_key, data, data_key=None, coords=None, res=None, single=F
 #   g_key: elevation data key in file
 #   topo: full-res topography data array
 #   t_unadjust: return temperature data without adjustment applied
-def Get_nc_adjust(dat, t_key, g_key, coords=None, res=None, topo=None, t_unadjust=False):
-    t_ar = Get_nc(dat, t_key, coords=coords, res=res)
+def Get_nc_adjust(dat, t_key, g_key, coords=None, res=None, topo=None, t_unadjust=False, bin_ext=0):
+    t_ar = Get_nc(dat, t_key, coords=coords, res=res, bin_ext=bin_ext)
     if not res and opt('interp_scale'):
         res = get_res((t_ar.shape[1],t_ar.shape[2]), scale=opt('interp_scale'))
     if not topo:
@@ -2894,6 +3008,7 @@ def Get_nc_adjust(dat, t_key, g_key, coords=None, res=None, topo=None, t_unadjus
         else:
             try:
                 topo = common('topo')   #check if topo already produced to avoid redundant work
+                verb('     Topo map already uploaded; reusing')
             except:
                 try:
                     print("  Uploading Higher-Resolution Topography")
@@ -2904,19 +3019,38 @@ def Get_nc_adjust(dat, t_key, g_key, coords=None, res=None, topo=None, t_unadjus
                     print("  Unable to upload topography map; proceeding without temperature adjustment")
                     adjust = np.zeros_like(t_ar)
                     return t_ar, adjust
-            
-    g_ar = Get_nc(dat, g_key, single=True, no_interp=True)
+    
+    try:
+        ground = common('ground')
+        elev_dif = common('elev_dif')
+    except:
+        ground = Get_nc(dat, g_key, single=True, no_interp=True)
+        ground = ground[0,:,:]
+        verb(f'     Comparing {g_key} and topo to find necessary adjustment')
+        ground_big = Interp(ground, interp_type=opt('interp_type'), coords_in=coords, res=res)
+        elev_dif = topo - ground_big
+        add_common('ground', ground)
+        add_common('elev_dif', elev_dif)
+        if opt('debug_file'):
+            add_common('ground_big', ground_big)
+
+
     clapse = opt('const_lapse_rate')
     if clapse is not None and clapse > 0:
-        lapse = np.ones_like(t_ar_sm) * -clapse / (1000*opt('gravity'))
+        verb(f'    Applying constant lapse rate of {clapse} K/km')
+        lapse = np.ones_like(t_ar) * -clapse / (1000*opt('gravity'))
     else:
+        verb(f'    Extracting {t_key} at original scale for calculating lapse rate')
         t_ar_sm = Get_nc(dat, t_key, no_interp=True)
-        lapse = Find_lapse(t_ar_sm, g_ar[0,:,:])
-    g_ar = Interp(g_ar, interp_type=opt('interp_type'), coords_in=coords, res=res)
-    lapse = Interp(lapse, interp_type=opt('interp_type'), coords_in=coords, res=res)
+        verb(f'    Finding lapse rate from {t_key} and {g_key}')
+        lapse = Find_lapse(t_ar_sm, ground)
+        lapse = Interp(lapse, interp_type=opt('interp_type'), coords_in=coords, res=res)
+    
+    adjust = lapse * np.expand_dims(elev_dif, 0)
 
-    dif = np.expand_dims(topo, 0) - g_ar
-    adjust = lapse * dif
+    if opt('debug_file'):
+        add_common('lapse', lapse)
+
     if not t_unadjust:
         t_ar += adjust
     return t_ar, adjust
@@ -2927,6 +3061,7 @@ def Get_nc_adjust(dat, t_key, g_key, coords=None, res=None, topo=None, t_unadjus
 # pet_method: method for estimating pet
 # no_interp: produce without interpolation
 def Get_pet(dat, data, pet_method=None, no_interp=False):
+    verb('    Gathering data for PET calculation')
 
     if not pet_method:
         pet_method = opt('pet_method')
@@ -2987,10 +3122,12 @@ def get_mask(dat, key, convert=False):
     try:
         mask = common('mask')
     except:
+        verb('    Retrieving land/sea mask')
         mask = Get_nc(dat, key, single=True, no_interp=True)
         if opt('sea_type') == 'sea_none':
             mask = np.ones_like(mask)
         if opt('interp_scale'):
+            verb('    Interpolating mask to output resolution')
             mask_big = Interp(mask, interp_type='nearest')  #save upscaled mask as well if using interpolation
             if convert:
                 mask_big = np.where(mask_big[0,:,:] > 0.5, True, False)
@@ -3025,7 +3162,9 @@ def Debug_file(data, params):
         newvar[:] = dim[:]
     lat_big = None
     data.update(params)
+    verb(f'    Saving {len(data)} data arrays to debug file')
     for k, v in data.items():
+        verb(f'     Saving {k}')
         latdim = names[0]
         londim = names[1]
         try:
@@ -3048,20 +3187,26 @@ def Debug_file(data, params):
                 newvar[:] = v[:]
         except:
             print(f'  Could not save {k} to debug file')
-    for m in ('mask','mask_big','mask_topo','topo'):
+    verb(f'    Searching for extra common data arrays for debug file')
+    for m in ('mask','mask_big','mask_topo','topo','ground','ground_big','elev_dif','lapse'):
         try:
             var = common(m)
-            if m == 'mask':
+            verb(f'     Saving {m}')
+            if m in ('mask','ground'):
                 latdim = names[0]
                 londim = names[1]
             else:
                 latdim = 'lat'
                 londim = 'lon'
-            newvar = debug.createVariable(m,'f8',(latdim,londim),compression='zlib', complevel=9)
+            if m == 'lapse':
+                newvar = debug.createVariable(m,'f8',('time',latdim,londim),compression='zlib', complevel=9)
+            else:
+                newvar = debug.createVariable(m,'f8',(latdim,londim),compression='zlib', complevel=9)
             newvar[:] = var[:]
         except:
             continue
     options = debug.createGroup('options')
+    verb(f'    Saving {len(kpasta_options)} options to debug file')
     for k,v in kpasta_options.items():
         if v is None:
             va = "None"
@@ -3103,10 +3248,6 @@ def Alternate_Data():
     dat.close()
 
     tas = (maxt + mint) / 2
-
-    pet = Get_pet(dat,{'tas':tas},'kalike')
-
-    aet = Estimate_evap(pet,ppt)
 
     all_data = dict(
         tas=tas,
@@ -3155,30 +3296,40 @@ def Get_params(files, land_funcs, sea_funcs):
         if opt('seasonless'):
             print("  Averaging data across months to produce seasonless climate")
         for f in files:         # determine parameters for each year before averaging together
+            verb(f'   Extracting from {f}')
             dat = nc.Dataset(f)
             try:
-                coords_from_file([dat],'lat','lon') #try to ensure coords read from file for eps inputs
+                coords_from_file(dat,'lat','lon') #try to ensure coords read from file for eps inputs
             except:
                 pass
+            verb('   Extracting data for land')
             data = land_funcs[0]([dat])
+            verb('   Extracting data for sea')
             data = sea_funcs[0]([dat], data)    # sea functions take data output from land function and add to it
+            verb('   Extracting any necessary extra data')
             data = Extra_Data([dat], data)  # extra data functions run in all cases
             if opt('seasonless'):
                 for k, v in data.items():
                     if v.ndim > 2:
                         data[k] = np.mean(v, 0, keepdims=True)  # for seasonless zones, average along time axis but keep dimension
+            verb(f'   Extracted data contains {[k for k,v in data.items()]}')
             if len(files) == 1:
                 print(" Processing data to climate parameters...")
+            verb('   Calculating parameters for land')
             par = land_funcs[1](data)
+            verb('   Calculating parameters for sea')
             par = sea_funcs[1](data, par)
+            verb('   Calculating any necessary extra parameters')
             Extra_Param(data, par)  #extra parameter functions
             if params:
                 for k,p in params.items():
                     params[k] = params[k] + par[k]
             else:
                 params = par
+            verb(f'   Calculated parameters are {[k for k,v in params.items()]}')
         for k,p in params.items():
             params[k] = params[k] / len(files)
+        
     else:
         if opt('force_alt_data'):
             print(" Using alternate data collection function...")
@@ -3189,25 +3340,33 @@ def Get_params(files, land_funcs, sea_funcs):
             if opt('file_combine') == 'seq' and len(files) > 1:
                 print("  Linking data across files into single year")
             dats = [nc.Dataset(f) for f in files]     # average data across years, then determine parameters
-            try:
-                coords_from_file([dat],'lat','lon') #try to ensure coords read from file for eps inputs
-            except:
-                pass
+            #try:
+            coords_from_file(dats[0],'lat','lon') #try to ensure coords read from file for eps inputs
+            #except:
+            #    pass
+            verb('   Extracting data for land')
             data = land_funcs[0](dats)
+            verb('   Extracting data for sea')
             data = sea_funcs[0](dats, data)
+            verb('   Extracting any necessary extra data')
             data = Extra_Data(dats, data)  
         if opt('seasonless'):
             print("  Averaging data across months to produce seasonless climate")
             for k, v in data.items():
                 if v.ndim > 2:
                     data[k] = np.mean(v, 0, keepdims=True)
+        verb(f'   Extracted data contains {[k for k,v in data.items()]}')
         if not opt('force_alt_data') and len(files) > 1:
             print(" Processing averaged data from all files to climate parameters...")
         else:
             print(" Processing data to climate parameters...")
+        verb('   Calculating parameters for land')
         params = land_funcs[1](data)
+        verb('   Calculating parameters for sea')
         params = sea_funcs[1](data, params)
+        verb('   Calculating any necessary extra parameters')
         params = Extra_Param(data, params)
+        verb(f'   Calculated parameters are {[k for k,v in params.items()]}')
     if opt('debug_file'):
         print(" Making debug file...")
         if opt('file_combine') == 'param' and len(files) > 1 and not opt('force_alt_data'):
@@ -3224,15 +3383,19 @@ def Get_clims(params, land_funcs, sea_funcs):
     print(" Determining climate zones...")
     try:
         mask = params['mask']   #check if mask is provided
+        verb('    Using provided land/sea mask')
     except:
         try:
             mask = common('mask_topo')
+            verb('   Using land/sea mask determined from topo map')
         except:
             try:
                 mask = common('mask_big')   # if not, check common, looking for topo mask, then big mask
+                verb('   Using upscaled land/sea mask')
             except:
                 try:
                     mask = common('mask')
+                    verb('   Using saved land/sea mask')
                 except:
                     for k, v in params.items():      # if no mask is found, construct a universally true mask based on the first at-least 2-dimensional array in params
                         if v.ndim >= 2:
@@ -3249,9 +3412,11 @@ def Get_clims(params, land_funcs, sea_funcs):
         do_land = np.full(mask.shape,True)
         do_sea = do_land
     if opt('efficient'):    # use efficient option to run algorithm on whole array at once
+        verb('   Using efficient classification functions')
         land_clims = land_funcs[2](params)
         sea_clims = sea_funcs[2](params)
     else:
+        verb('   Iterating through map to classify climates')
         for y in range(mask.shape[0]):     # for most cases, iterate over each cell and run function individually
             for x in range(mask.shape[1]):
                 for k, v in params.items():
@@ -3271,14 +3436,17 @@ def Get_clims(params, land_funcs, sea_funcs):
         else:
             outname = 'output'
         for k,v in zip(('land','sea'), (land_clims,sea_clims)):
+            verb(f'   Making {k} chart')
             chart_im = Make_chart(v,params)
             if chart_im is not None:
                 chart_im.save(outname + '_' + k + '_chart.png')
                 print("  Saved to " + outname + '_' + k + '_chart.png')
     if opt('blend'):
+        verb('   Blending land and sea maps to single image')
         clims = np.where(do_land, land_clims, sea_clims)
         maps['full'] = clims
     else:
+        verb('   Producing separate land and sea maps')
         maps['land'] = land_clims
         maps['sea'] = sea_clims
     return maps 
@@ -3287,6 +3455,7 @@ def Get_clims(params, land_funcs, sea_funcs):
 
 #Add colors in dictionary to colmap array, extending as necessary:
 def Add_color(colmap, colors):
+    verb(f'    Adding {len(colors)} colors to color map')
     extra = int(max(colors)) - (len(colmap) - 1)
     if extra > 0:
         colmap = np.pad(colmap, ((0,extra),(0,0)))
@@ -3314,6 +3483,7 @@ def Make_colmap(land_type=None, land_color=None, sea_type=None, sea_color=None, 
     colmap = Add_color(colmap, def_color)   # default colors always added
     
     if land_color == ('file') or sea_color == ('file'):     # add colors from list first so later additions override it
+        verb('    Reading color file')
         cfg = configparser.ConfigParser()
         cfg.optionxform = str
         cfg.read(color_file)
@@ -3327,7 +3497,8 @@ def Make_colmap(land_type=None, land_color=None, sea_type=None, sea_color=None, 
         colmap = Add_color(colmap, file_colors)
 
     if land_color != ('file'):
-        
+        verb('    Loading default color lists')
+
         if land_type == ('Koppen-Geiger') or land_type == ('KG_unproxied') or land_type == ('TwoParamKG'):
             if land_color == ('standard'):
                 colmap = Add_color(colmap, koppen_standard_color)
@@ -3419,12 +3590,14 @@ def Make_key(maps, colmap=None):
     if colmap is None:
         colmap = Get_colmap()
 
+    verb('     Finding all used climate zones')
     keys = []
     for k, v in maps.items():   #finds all climate zone types used in maps
         for x in np.nditer(v):
             if x not in keys:
                 keys.append(x)
-                
+    
+    verb('   Finding names for climate zones')
     zones = {}
     glob = list(globals().items())
     for k, v in glob:    #attempts to find names for each climate by searching global variables
@@ -3434,6 +3607,7 @@ def Make_key(maps, colmap=None):
             except:
                 zones[k] = v
     
+    verb(f'   Found {len(keys)} zones, constructing key image')
     key_im = Image.new(mode="RGB", size=(1000,len(zones)*25+5), color=(0,0,0))
     im = ImageDraw.Draw(key_im)
     font_size = opt('font_size')
@@ -3475,6 +3649,8 @@ def Make_chart(clim, par):
     
     colmap = Get_colmap()
 
+    verb('     Constructing chart image')
+
     font_size = opt('font_size')
     font = ImageFont.load_default(size=font_size) #load default font
 
@@ -3499,6 +3675,8 @@ def Make_chart(clim, par):
 
     tco = 40 + np.round((ta-mint)*10)   #map coordinates
     pco = 19 + plen - np.round((pr-pmin))
+
+    verb('    Charting points on map by average climate')
     points = {}
     for x in range(clim.shape[0]):
         for y in range(clim.shape[1]):
@@ -3508,6 +3686,7 @@ def Make_chart(clim, par):
                     points[ind].append(clim[x,y])   #assemble list of climates on each point
                 except:
                     points[ind] = [clim[x,y]]
+    verb(f'     Charted {clim.shape[0] * clim.shape[1]} map points to {len(points)} chart pixels, coloring by most common climate zone')
     for k, v in points.items():
         co = k.split(',')
         if len(v) == 1:
@@ -3553,6 +3732,7 @@ def Make_image(maps, outname=None, in_opts = None):
             scale = opt('image_scale')
             if type(scale) is not tuple:
                 scale = (round(outim.size[0]*scale),round(outim.size[1]*scale))
+            verb(f'   Scaling output image to {scale}')
             outim = outim.resize(scale, resample=Image.Resampling.NEAREST)
         if len(maps) > 1:
             savename = outname + '_' + k + '.png'
@@ -3609,7 +3789,8 @@ def Save_opts(in_opts=None):
     except:
         pass
 
-    if opt('pas_simple_input'):
+    if opt('pas_simple_input'):     #meta option to set all other options
+        verb('   Setting all options for simple pasta input per pas_simple_input')
         add_opt({
             'pet_method': 'kalike',
             'estimate_evap': 'all',
@@ -3644,6 +3825,7 @@ def Make_clim(files, in_opts=None):
         sea_funcs = Clim_func[opt('sea_type')]
     params = Get_params(files, land_funcs, sea_funcs)
     maps = Get_clims(params, land_funcs, sea_funcs)
+
             
     return maps
 
@@ -3747,6 +3929,7 @@ def Template_Data_advanced(dat):
     
     temp, adjust = Get_nc_adjust(dat, 'temp key', 'elevation key', coords)   # to allow for temperature adjustment by topography, run with temperature and model elevation data
                                                                                 # (will automatically find topo map file, or return zero adjustment if not using one)
+    max_t = Get_nc(dat, 'max key', bin_ext = 1)     # use bin_ext to ensure proper behavior during binning (1 for max, -1 for min, 0 or leave out for average)
 
     all_data = dict(
         temp=temp,
@@ -3799,6 +3982,7 @@ def Koppen_Param(data):
     tas = data['tas']   #2-meter air temp in C
     pr = data['pr']     #precipitaiton in mm/month
 
+    verb('    Finding basic parameters')
     Avg_Temp = np.mean(tas, axis=0)
     Total_Precip = np.mean(pr, axis=0)*12 #Converts to mm/year
     Max_Temp = np.amax(tas, axis=0)
@@ -3807,16 +3991,20 @@ def Koppen_Param(data):
 
     timel = len(tas)        #Should come back and optimize this whole section at some point, it's such a memory hog
     if timel > 1:
+        verb('    Dividing year into summer and winter halfs')
         halfl = math.floor(timel/2)
         if opt('kg_summer_zenith'):
+            verb('     Using solar zenith angle')
             czen = data['czen']     #cosine of zenith star angle
             long = np.concatenate((czen,czen[:halfl,:,:]), axis=0)
         else:
+            verb('    Using monthly temperature')
             long = np.concatenate((tas,tas[:halfl,:,:]), axis=0)
         sum_ar = np.sum(np.stack([long[m:m+halfl] for m in range(halfl)], 0), axis=0)   #stack half-year slices together and then sum them together to produce array of total values over following half-year for each month
         pr_long = np.concatenate((pr,pr),axis=0)    #create double-length array of precipitation
         pr_stack = np.stack([pr_long[m:m+timel] for m in range(timel)], axis=0)     #stack full-year slices together starting on each month of the year
         sum_max = np.argmax(sum_ar, axis=0)
+        verb('    Finding summer and winter precipitation')
         precips = np.empty_like(pr)
         for y in range(pr.shape[1]):       #Bit of an inefficient approach, but haven't quite bothered to figured out how to do this as a numpy operation
             for x in range(pr.shape[2]):
@@ -3831,17 +4019,20 @@ def Koppen_Param(data):
                     else:
                         add_odd = pr[0 if ind+halfl == timel else ind+halfl+1,y,x]
                     Summer_Precip[y,x] = (halfl*2*Summer_Precip + 6*add_odd)/(halfl*2+1)
+        verb('    Finding seasonal precipitation extremes')
         Max_Sum_Precip = np.amax(precips[:halfl,:,:], axis=0)
         Min_Sum_Precip = np.amin(precips[:halfl,:,:], axis=0)
         Max_Win_Precip = np.amax(precips[halfl:,:,:], axis=0)   #winter is counted as 1-month longer for odd months, but eh it's good enough for now
         Min_Win_Precip = np.amin(precips[halfl:,:,:], axis=0)
     else:
+        verb('    Using backup calculations for "seasonless" equivalents of seasonal parameters')
         Summer_Precip = Total_Precip/2      #backup options for seasonless zones
         Max_Sum_Precip = Total_Precip/12
         Min_Sum_Precip = Max_Sum_Precip
         Max_Win_Precip = Max_Sum_Precip
         Min_Win_Precip = Max_Sum_Precip
-        
+    
+    verb('    Determining length of "summer" above 10 C')
     Summer_Length = np.sum(np.where(tas>10,1,0), axis=0)/len(tas) #Portion of year above 10 C
 
     all_param = dict(
@@ -3938,7 +4129,18 @@ def Koppen_Alg(par):
             elif Min_Precip > 100-Total_Precip/25:
                 clim = Am
             else:
-                if Summer_Precip < Total_Precip/2 and opt('land_subtype') == 'full':
+                Xs = False
+                if opt('land_subtype') == 'full':
+                    if opt('kg_med_as'):
+                        if (Min_Sum_Precip < opt('kg_med_summer_precip')
+                            and Max_Sum_Precip > 3 * Min_Sum_Precip
+                            and (Summer_Precip < Total_Precip/2
+                                or (opt('kg_wet_season_req') != 'med_strict'
+                                    and opt('kg_wet_season_req') != 'all_strict'))):
+                            Xs = True
+                    elif Summer_Precip < Total_Precip/2:
+                        Xs = True
+                if Xs:
                     clim = As
                 else:
                     clim = Aw
@@ -4134,7 +4336,16 @@ def Trewartha_Alg(par):
             if Min_Precip > 60:
                 clim = TrAr
             else:
-                if Summer_Precip < Total_Precip/2 and opt('land_subtype') == 'full':
+                Xs = False
+                if opt('land_subtype') == 'full':
+                    if opt('kg_med_as'):
+                        if (Summer_Precip < Total_Precip/4
+                            and Min_Precip < opt('kg_med_summer_precip')
+                            and Total_Precip < 890):
+                            Xs = True
+                    elif Summer_Precip < Total_Precip/2:
+                        Xs = True
+                if Xs:
                     clim = TrAs
                 else:
                     clim = TrAw
@@ -4187,9 +4398,11 @@ def Holdridge_Param(data):
     tas = data['tas']   #2-meter air temperature in C
     pr = data['pr']     #precipitation in mm/month
 
+    verb('    Calculating total precipitation')
     Total_Precip = np.mean(pr, 0)*12
 
     if opt('h_estimate_biot_avg'):  #rough attempt to estimate average biotemperature based only on a single annual average temperature
+        verb('    Estimating biotemperature from average temperature')
         Ta = tas - 15
         Tb = tas - 25
         biot = np.where(tas < -20, 0,
@@ -4198,6 +4411,7 @@ def Holdridge_Param(data):
                             np.where(tas < 35, tas - 0.046*Tb**2 - 0.02*Tb,
                                 30))))
     else:
+        verb('    Calculating biotemperature')
         biot = np.where(tas < 0, 0,
                     np.where(tas > 30, 30,
                              tas))
@@ -4209,6 +4423,7 @@ def Holdridge_Param(data):
         )
 
     if not opt('h_no_pet'):
+        verb('    Calculating PETR')
         pet = data['pet']   #potential evapotranspiration in mm/month
         PETR = 12*np.mean(pet, 0) / np.maximum(Total_Precip, 0.001)    #avoid div0 error
         all_param['PETR'] = PETR
@@ -4718,7 +4933,7 @@ def Woodward_Data(dat):
         tdif = tas-ts
     else:
         tdif = 0
-    mint = Get_nc(dat, 'mint', adjust=adjust+tdif)
+    mint = Get_nc(dat, 'mint', adjust=adjust+tdif, bin_ext = -1)
 
 
     pr = Get_nc(dat, 'pr')
@@ -4909,23 +5124,27 @@ def Biome_Data(dat):
     ps = Get_nc(dat, 'ps')
 
     if opt('temp_tunings') == 'tavg':
+        verb('    Skipping maxt and mint extracting, just using average temp')
         maxt = - opt('temp_adjust')
         mint = - opt('temp_adjust')
         tdif = 0
     else:
         if opt('temp_adjust_ts'):
+            verb('    Finding adjustment from surface temp to 2-meter air temp')
             ts = Get_nc(dat, 'ts')
             tdif = tas - ts #adjustment from surface to 2-meter to apply to maxt and mint
         else:
             tdif = 0
-        maxt = Get_nc(dat, 'maxt', adjust=tdif)
-        mint = Get_nc(dat, 'mint', adjust=tdif)
+        maxt = Get_nc(dat, 'maxt', adjust=tdif, bin_ext = 1)
+        mint = Get_nc(dat, 'mint', adjust=tdif, bin_ext = -1)
     pr = Get_nc(dat, 'pr', no_interp = True)
 
     if opt('estimate_evap') == 'all' or (opt('interp_scale') and opt('estimate_evap') == 'sea'):
+        verb('    Gathering data to estimate evapotranspiration')
         pet_small = Get_pet(dat, {}, no_interp = True)  #use original resolution
         evap = Estimate_evap(pet_small, pr*opt('precip_adjust'))  #estimate evaporation from pet and pr
         if opt('estimate_evap') == 'sea':
+            verb('    Combining evap data for land with estimated evap for sea')
             evap_land = Get_nc(dat, 'evap', no_interp = True)
             evap_land *= -opt('precip_adjust')   #convert from m/s to mm/month (and flip sign)
             evap = np.where(get_mask(dat, 'lsm', convert=True), evap_land, evap)    #apply evap estimation only to sea areas
@@ -4965,12 +5184,13 @@ def Biome_Data(dat):
         pr=pr * opt('precip_adjust'),
         ps=ps,
         rin=rin,
-        adjust=adjust
+        adjust=adjust,
+        tdif=tdif,
         )
     
     if opt('land_type') != 'Prentice':
         if opt('pas_ice_def') in ('ice', 'ice_noadj'):
-            snd = Get_nc(dat, 'snd', no_interp = True)
+            snd = Get_nc(dat, 'snd', no_interp = True, bin_ext = -1)
             ice = np.minimum(snd,0.4)   #helps get smoother interpolation
             if opt('interp_scale'):
                 ice = Interp(ice)
@@ -4996,7 +5216,7 @@ def Biome_Param(data):
         maxt = data['maxt']     #absolute maximum temperature in C
         mint = data['mint']     #absolute minimum temperature in C
 
-    
+    verb('    Finding temperature extremes')
     Min_Abs = np.amin(mint, 0)
     Max_Abs = np.amax(maxt, 0)
     Max_Avg = np.amax(tas, 0)
@@ -5006,6 +5226,8 @@ def Biome_Param(data):
     Max_Abs = np.maximum(Max_Abs, Max_Avg)
 
     ##GDD config
+
+    GInt_th = opt('pas_gint_thresh')  #threshold of growth interruption to interrupt GDD accumulation; 1250 by default
 
     GDDbase = 5     #base temp for GDD (C)
     GDDplats = 25   #'plateau' start; point of maximum GDD
@@ -5024,6 +5246,7 @@ def Biome_Param(data):
     GDDlzplats = 100 / opt('gdd_par_ratio') #corresponds to 200 for sunlike PAR ratio of 0.5
         #note that these are separately defined for sea zones as a backup if GDDlz not produced here (but to the same default values)
 
+    verb('    Calculating GDD parameters')
     GDD = Calc_GDD(tas, base=GDDbase, plat_start=GDDplats, plat_end=GDDplate, comp=GDDtop)
     GDDz = Calc_GDD(tas, base=GDDzbase, plat_start=GDDzplats, plat_end=GDDzplate, comp=GDDztop)
 
@@ -5040,15 +5263,24 @@ def Biome_Param(data):
 
     GDDp = (GDD)/np.maximum(np.sum(GDD,0),0.001)    #portion of total GDD in each month
 
+    verb('    Calculating moisture parameters')
+
     Ar = np.mean(evap,0) / np.maximum(np.mean(pet,0), 0.001)  #avoid div0 errors
     GAr = np.sum(GDDp*evap,0) / np.maximum(np.sum(GDDp*pet,0), 0.001)
 
     Evr = np.mean(evap,0) / np.maximum(np.mean(pr,0), 0.001)
     GrS = np.sum(GDDp*pr,0) / np.maximum(np.mean(evap, 0), 0.001)
 
-    GInt = Calc_GDD_total(np.maximum(0, opt('month_length') * 450-GDDz))
 
-    GDD = Calc_GDD_total(GDD)
+    verb('    Totaling GDD')
+    if opt('land_type') == 'Prentice':
+        GDD = Calc_GDD_total(GDD)
+        GInt = None
+    else:
+        GInt = opt('month_length') * 450-GDDz
+        GInt = np.maximum(GInt, 0)      #clamp to positive
+        GDD, GInt = Calc_GDD_total(GDD, GInt, th_gi=GInt_th)
+
     GDDz = Calc_GDD_total(GDDz)
 
     all_param = dict(
@@ -5068,6 +5300,7 @@ def Biome_Param(data):
     
     if opt('land_type') != 'Prentice':
         if opt('pas_ice_def') in ('ice', 'ice_noadj'):
+            verb('    Finding ice cover')
             ice = data['ice']   #ice and snow thickness in m
             Min_Ice = np.amin(ice, 0)
             if opt('interp_scale') and opt('topo_map') and opt('pas_ice_def') == 'ice':     #hacks for interpolation with temperature adjustments
@@ -5080,6 +5313,7 @@ def Biome_Param(data):
         elif opt('pas_ice_def') == 'maxt':
             all_param['Max_tice'] = np.amax(data['tice'], 0)
         if opt('land_type') == 'Pasta' and opt('pas_boil_pres'):
+            verb('    Determining boiling point')
             ps = data['ps']  #surface pressure in hpa
             boilp = np.where(maxt > 108.3, 10**(10.26509-1810.94/(244.485+maxt)), 10**(10.19621-1730.63/(233.426+maxt)))     #antoine equation
             boil = np.where(maxt > 0, np.where(ps*100 < boilp, 1, 0), 0)
@@ -5295,7 +5529,7 @@ def Pasta_Alg(par):
     th_CE = 1300    #boreal
 
     # GInt
-    th_XT = 1250    #peritropical
+    th_XT = opt('pas_gint_thresh')    #peritropical; 1250 by default
 
     #winter minimum
     th_cool = 10    #cool winter
@@ -5396,13 +5630,13 @@ def Pasta_Alg(par):
             else:
                 clim = Ada
     else:
-        XF = GDD < th_XF  #marginal test
+        XT = GInt < th_XT    #peritropical test
+        XF = not XT and GDD < th_XF  #marginal test
         mild = Min_Abs > th_cool     #mild winter test
         warm = not boiling and Max_Abs < th_hot     #warm summer test
         XA = GAr < th_XXs  #semiarid test
         Xs = Ar < th_XXf  #savanna test
         Xxp = Evr < th_XXp  #pluvial test
-        XT = GInt < th_XT    #peritropical test
         XM = GrS < th_XM    #med test
         if mild and warm:    #tropical test
             if XG:
