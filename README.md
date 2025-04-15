@@ -32,8 +32,12 @@ kpasta_options.cfg
 defaultcolor.ini
   config file to allow user to select their own rgb values for the maps output by the above script
 
+im2sra_n.py
+  Script to take greyscale heightmap images and convert them to scaled .sra files that can be read by ExoPlaSim as topography input.
+  Based on Image2sra below (and retains some of Alex's code) but updated for more flexible input options.
+
 Image2sra_2.0.3.py
-  Script to take greyscale heightmap images and convert them to scaled .sra files that can be read by ExoPlaSim as topography input. Created by Alex (Ostimeus), distributed with permission.
+  Original script for converting heightmaps to .sra files. Created by Alex (Ostimeus), distributed with permission.
   Ost has made their own repository for this script bundled into an exoplasim configuration tool https://github.com/MegalexMaster/ExoPlaSim-InCon
   I'll leave this script in place here but it may not include later bugfixes (and the tool is nifty anyway).
   
