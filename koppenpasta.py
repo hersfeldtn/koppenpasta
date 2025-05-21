@@ -8,7 +8,7 @@ import configparser
 from PIL import Image, ImageFont, ImageDraw
 import os
 
-ver_num = "2.1.0"
+ver_num = "2.1.1"
 
 ### GUIDANCE
 
@@ -1176,7 +1176,7 @@ pasta_earthlike_color = {   #wip, will implement later
     Ahe: [0,0,0]
 }
 
-pasta_true_color = {    #also wip, just copied above as placeholder
+pasta_true_color = {
     TUr: [41,63,13],
     TUrp: [42,65,16],
     TUf: [55,74,20],
@@ -2324,7 +2324,7 @@ If using sequential file combination, binning is applied afterwards to combined 
 For an input of "1" or "0" the script will not bin months together.
 Set bin size: '''))
     if in_opts['bin_months'] > 1 and in_opts['land_type'] in ('Woodward','Prentice','Pasta','KG_unproxied'):
-        in_opts['bin_preserve_ext'] = Prompt_bool('''
+        in_opts['bin_preserve_ext'] = not Prompt_bool('''
 Binning of Temperature Extremes
 By default, max temperature in each bin is maximum of the binned months
     and min temerature is the minimum
