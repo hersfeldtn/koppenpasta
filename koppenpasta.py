@@ -8,7 +8,7 @@ import configparser
 from PIL import Image, ImageFont, ImageDraw
 import os
 
-ver_num = "2.1.1"
+ver_num = "2.3.0"
 
 ### GUIDANCE
 
@@ -176,7 +176,7 @@ option_def = {
     'pas_boil_pres': True,              # calculate boiling point from surface pressure, rather than using constant 100 C
     'pas_ice_def': 'ice',               # (kg)parameter for defining ice cover, for land and sea
     'pas_med_thresh': 0,                # (kg)forces alternate GrS threshold for Mediterranean zones, leave at 0 to use defaults
-    'pas_gint_thresh': 1250,            # (kg)threshold of GInt for both stopping GDD accumulation and 
+    'pas_gint_thresh': 1250,            # (kg)threshold of GInt for both stopping GDD accumulation and marking peri/quasitropical from eutropical
     'pas_simple_input': False,          # (kg)(p)alters other options at startup to accommodate only tas and pr inputs
     }
 
@@ -551,6 +551,28 @@ Ot=600
 Oh=601
 Or=602
 Oe=603
+
+#Extra simplified Pasta
+CT=610
+CD=611
+CE=612
+CM=613
+CA=614
+CF=615
+HT=616
+HD=617
+HM=618
+HA=619
+HF=620
+ET=621
+ED=622
+EM=623
+EA=624
+EF=625
+Ad=626
+Ah=627
+
+
 
 ### COLOR DICTIONARIES
 
@@ -1078,6 +1100,8 @@ pastaocean_standard_color = {
     Oe: [81,9,170]
     }
 
+
+
 pasta_earthlike_color = {   #wip, will implement later
     TUr: [0,0,255],
     TUrp: [4,0,191],
@@ -1274,6 +1298,8 @@ pasta_true_color = {
     Ahe: [208,181,141]
 }
 
+
+
 pastaocean_true_color = {
     Ofi: [240,240,240],
     Ofd: [10,10,51],
@@ -1285,6 +1311,27 @@ pastaocean_true_color = {
     Or: [10,10,51],
     Oe: [10,10,51]
     }
+
+pasta_simple_color = {
+    CT: CTf,
+    CD: CDa,
+    CE: CEb,
+    CM: CAMa,
+    CA: CAa,
+    CF: CFb,
+    HT: HTf,
+    HD: HDb,
+    HM: HAMb,
+    HA: HAb,
+    HF: HFb,
+    ET: ETf,
+    ED: EDa,
+    EM: EAMa,
+    EA: EAb,
+    EF: EFb,
+    Ad: Ada,
+    Ah: Aha
+}
 
 ### CLIMATE ZONE NAMES
 
@@ -1618,7 +1665,25 @@ name_key = {
     Ot:   'Ot: Tropical Ocean',
     Oh:   'Oh: Hot Ocean',
     Or:   'Or: Torrid Ocean',
-    Oe:   'Oe: Extraseasonal Ocean'
+    Oe:   'Oe: Extraseasonal Ocean',
+    CT:   'CT: Subtropical',
+    CD:   'CD: Temperate',
+    CE:   'CE: Boreal',
+    CM:   'CM: Mediterranean',
+    CA:   'CA: Cold Semiarid',
+    CF:   'CF: Tundra',
+    HT:   'HT: Supertropical',
+    HD:   'HD: Swelter',
+    HM:   'HM: Paramediterranean',
+    HA:   'HA: Hot Semiarid',
+    HF:   'HF: Parch',
+    ET:   'ET: Extratropical',
+    ED:   'ED: Extracontinental',
+    EM:   'EM: Extramediterranean',
+    EA:   'EA: Extraseasonal Semiarid',
+    EF:   'EF: Pulse',
+    Ad:   'Ad: Semidesert',
+    Ah:   'Ah: Hyperarid Desert'
     }
 
 
@@ -1994,7 +2059,7 @@ Add additional inputs? (y/n): '''):
                 if nextin == ('stop') or nextin == ('STOP'):
                     break
                 else:
-                    in_files.append(Prompt_files(path+nextin))
+                    in_files+=(Prompt_files(path+nextin))
 
     if Prompt_bool('''
 Load alternative config file? (y/n): '''):
@@ -2138,12 +2203,21 @@ Pasta Subtype
 2: Earthlike-only: exclude Hot (H) zone, Extraseasonal (E) zones, and their arid counterparts,
     and ignore light limitations
 3: As above, but exclude pluvial (Xxp) zones as well
+4: Simplified: no pluvials (Xxp) or thermal subtypes (Xxa, Xxb, Xxc, arid Axc etc.),
+    combine barren (XG) into marginal (XF),
+    tropical rainforest (TXr) into forest (TXf),
+    peritropical moist savanna (XTs) and forest (XTf)
+    and submediterranean (XM) and mediterranean (XAM)
+5: Simplified Earthlike: as above, but exclude Hot (H) and Extraseasonal (E)
+    and ignore light limitations
 Set climate zone subtype: '''),
             ('full',
             'no_pluv',
             'earthlike',
-            'earthlike_no_pluv'))
-        if False: #in_opts ['land_subtype'] in ('earthlike', 'earthlike_no_pluv'):  #I may implement a separate earthlike-focused color set one day
+            'earthlike_no_pluv',
+            'simple',
+            'simple_earthlike'))
+        if False: #in_opts ['land_subtype'] in ('earthlike', 'earthlike_no_pluv', 'simple_earthlike'):  #I may implement a separate earthlike-focused color set one day
             color_prompt = ('''
 Pasta Colors
 0: Default colors
@@ -2926,7 +3000,82 @@ def Estimate_evap(pet, pr):
             evap[t,:,:] = np.where(surpdef[t,:,:] > 0, pr[t,:,:] + sev, pet[t,:,:])     #evaporation equal to pet where pr exceeds it, pr + soil evaporation otherwise
             soilw[t,:,:] = np.minimum (500, soilw[t-1,:,:] - np.where(surpdef[t,:,:] > 0, sev, surpdef[t,:,:]))     #soil water adjusted but limited to 50 cm
         diff = np.absolute(soilw[-1,:,:] - initsw)
-    return evap          
+    return evap
+
+#Estimate monthly average surface radiation based on orbit, rotation, and latitude
+# returns average radiation data array in W/m^2
+# Only works for rapidly rotating planets (day length << month length)
+#   ex: example data array to copy size
+#   lat: latitude array to use
+#   obl: planetary obliquity in degrees
+#   ecc: orbital eccentricity
+#   argobl: argument of obliquity
+#   solmonth: index of month closest to the northern summer solstice
+#   monthoff: offset of solstice from center of above month in degrees (as portion of year)
+#   flux = stellar flux at planet semimajor axis in W/m^2
+#   loss = portion of flux presumed lost in atmosphere
+def Estimate_rad(ex, lat=None, obl=23.44, ecc=0.0, argobl=0, solmonth=5, monthoff=-6, flux=1367, loss=1/4):
+    verb('    Estimating surface radiation from orbital parameters and latitude')
+    flux = flux * (1-loss)
+    ashape = ex.shape
+    if len(ashape) < 3:
+        ashape = (12,ashape[0],ashape[1])   #if working without time dimension, will find average from year by sampling from 12 months
+    if lat is None:
+        lat,lon = get_coords((ashape[1], ashape[2]), big=True)
+    anoms = np.linspace(0, 360, ashape[0], endpoint=False)     #create array of mean anomaly for each month
+    anoms = np.roll(anoms, solmonth)        #offset to place 0 mean anom at sum solstice
+    anoms = anoms + monthoff     #offset based on monthoff
+    anoms = anoms % 360     #constrain to 0-360 range
+    if ecc > 0.0:
+        anoms -= argobl #shift to count from vernal equinox
+        anoms = anoms % 360
+        tanoms = anoms
+        for m in range(len(anoms)):     #find eccentric anomaly by newton's method
+            a = anoms[m]
+            if a == 0 or a==180:  #skip if 0 or 180
+                continue
+            ecca = a
+            ecca1 = ecc + 180
+            while abs(ecca-ecca1) > 0.1:  #0.1 degree tolerance
+                ecca1 = ecca
+                ecca = ecca - math.degrees((math.radians(ecca) - ecc * math.sin(math.radians(ecca)) - math.radians(a)) /
+                    1 - ecc * math.cos(math.radians(ecca)))
+            ta = math.degrees(math.acos((math.cos(math.radians(ecca))-ecc) /
+                (1 - ecc * math.cos(math.radians(ecca)))))      #convert to true anomaly
+            if ecca > 180:  #adjust for domains
+                ta *= -1
+                ta += 360
+            tanoms[m] = ta
+        dists = (1-ecc**2) / (1+ecc * math.cos(math.radians(tanoms)))  #distance from star relative to SMA
+        fluxes = flux / dist**2  #stellar flux at each point in orbit
+        tanoms += argobl #shift back to count from solstice
+        tanoms = tanoms % 360
+    else:
+        fluxes = np.ones_like(anoms) * flux #if no eccentricity, constant flux
+        tanoms = anoms
+    decs = np.sin(np.radians(tanoms+90)) * math.radians(180 - obl if obl > 90 else obl)    #stellar declination
+
+    qds = []
+
+    for m in range(len(decs)):
+        dec = decs[m]
+        ind = np.tan(lat) * math.tan(dec)
+        ind = np.where(ind > 1, -1, np.where(ind < -1, 1, -ind))
+        ho = np.arccos(ind)     #hour angle of sunrise
+        #ho = np.where(ind > 1, math.pi, np.where(ind < -1, 0, np.arccos(-ind)))
+        qd = fluxes[m] / math.pi * (ho * np.sin(lat) * math.sin(dec) + np.cos(lat) * math.cos(dec) * np.sin(ho))
+        qd = qd * np.ones([ashape[2],ashape[1]])
+        qd = np.swapaxes(qd, 0, 1)
+        qds.append(qd)
+    
+    rad = np.stack(qds)
+
+    if len(ashape) < 3:
+        rad = np.mean(rad, 0)
+
+    return rad
+
+
 
 #Pull data from exoplasim output netcdf file and process as necessary
 # returns the processed array
@@ -3227,9 +3376,13 @@ def Debug_file(data, params):
 # and it will be run instead of the climate-specific data function if force_alt_data is true,
 # ignoring any usual file inputs
 def Alternate_Data():
+    
+    fac = 4
+
     dat = nc.Dataset('TerraClimate19812010_tmax.nc')
     maxt = dat['tmax'][:]
     dat.close()
+    rin = Estimate_rad(np.ones([maxt.shape[0],int(maxt.shape[1]/fac),int(maxt.shape[2]/fac)]))
     
     dat = nc.Dataset('TerraClimate19812010_tmin.nc')
     mint = dat['tmin'][:]
@@ -3257,12 +3410,12 @@ def Alternate_Data():
         evap=aet,
         pet=pet,
         land=np.where(mint==mint[0,0,0],0.0,1.0)
+        #rin=rin
         )
 
     
     #mask = np.where(mint==mint[0,0,0],False,True)
     #add_common('mask', mask[0,:,:])
-    fac = 8
     for k,v in all_data.items():
         new1 = np.empty((12,int(4320/fac),8640), dtype=v.dtype)
         new2 = np.empty((12,int(4320/fac),int(8640/fac)), dtype=v.dtype)
@@ -3274,7 +3427,9 @@ def Alternate_Data():
             mask = np.where(np.isnan(new2[0,:,:]), False, True)
             mask = np.where(new2[0,:,:]>0.5,True,False)
             add_common('mask', mask)
-        all_data[k] = np.where(np.isnan(new2), 0, new2)
+        all_data[k] = np.where(np.isnan(new2), 0, new2[:])
+    
+    all_data['rin'] = rin
     
     return all_data
     
@@ -3557,6 +3712,7 @@ def Make_colmap(land_type=None, land_color=None, sea_type=None, sea_color=None, 
                 colmap = Add_color(colmap, pasta_earthlike_color)
             elif land_color == ('true'):
                 colmap = Add_color(colmap, pasta_true_color)
+            colmap = Add_color(colmap, pasta_simple_color)
                 
     if sea_color != ('file'):
         if sea_type == ('sea_standard'):
@@ -5204,6 +5360,7 @@ def Biome_Data(dat):
     return all_data
 
 def Biome_Param(data):
+
     tas = data['tas']   #2-meter air temperature in C
     evap = data['evap']     #evaporation in mm/month
     pr = data['pr']         #precipitation in mm/month
@@ -5251,7 +5408,7 @@ def Biome_Param(data):
     GDDz = Calc_GDD(tas, base=GDDzbase, plat_start=GDDzplats, plat_end=GDDzplate, comp=GDDztop)
 
     GDDlz = None
-    if opt('land_subtype') == 'earthlike' or opt('land_subtype') == 'earthlike_no_pluv':
+    if opt('land_subtype') in ('earthlike', 'earthlike_no_pluv', 'simple_earthlike'):
         pass
     elif opt('gdd_limit_light'):
         rin = data['rin']
@@ -5576,11 +5733,11 @@ def Pasta_Alg(par):
     if opt('pas_med_thresh') > 0:   #override set med thresholds
         th_XM = opt('pas_med_thresh')
 
-    if opt('land_subtype') in ('no_pluv', 'earthlike_no_pluv'):  #disable pluvial zones
+    if opt('land_subtype') in ('no_pluv', 'earthlike_no_pluv', 'simple', 'simple_earthlike'):  #disable pluvial zones
         th_XXp = -1
         th_TXrp = -1
     
-    if opt('land_subtype') in ('earthlike', 'earthlike_no_pluv'):    #disable non-earthlike zones
+    if opt('land_subtype') in ('earthlike', 'earthlike_no_pluv', 'simple_earthlike'):    #disable non-earthlike zones
         boiling = False
         th_hot = 1000
         th_torrid = 1000
@@ -5866,6 +6023,49 @@ def Pasta_Alg(par):
                         clim = EDap
                     else:
                         clim = EDa
+    
+    #simplified zones
+    if opt('land_subtype') in ('simple', 'simple_earthlike'):
+        if clim == TUr:
+            clim = TUf
+        elif clim == TG:
+            clim = TF
+        elif clim in (CTf, CTs):
+            clim = CT
+        elif clim in (CDa, CDb):
+            clim = CD
+        elif clim in (CEa, CEb, CEc):
+            clim = CE
+        elif clim in (CMa, CMb, CAMa, CAMb):
+            clim = CM
+        elif clim in (CAa, CAb):
+            clim = CA
+        elif clim in (CFa, CFb, CG):
+            clim = CF
+        elif clim in (HTf, HTs):
+            clim = HT
+        elif clim in (HDa, HDb, HDc):
+            clim = HD
+        elif clim in (HMa, HMb, HMc, HAMa, HAMb, HAMc):
+            clim = HM
+        elif clim in (HAa, HAb, HAc):
+            clim = HA
+        elif clim in (HFa, HFb, HFc, HG):
+            clim = HF
+        elif clim in (ETf, ETs):
+            clim = ET
+        elif clim in (EDa, EDb):
+            clim = ED
+        elif clim in (EMa, EMb, EAMa, EAMb):
+            clim = EM
+        elif clim in (EAa, EAb):
+            clim = EA
+        elif clim in (EFa, EFb, EG):
+            clim = EF
+        elif clim in (Ada, Adc, Adh, Ade):
+            clim = Ad
+        elif clim in (Aha, Ahc, Ahh, Ahe):
+            clim = Ah
     return clim
                     
 
