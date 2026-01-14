@@ -8,7 +8,7 @@ import configparser
 from PIL import Image, ImageFont, ImageDraw
 import os
 
-ver_num = "2.3.0"
+ver_num = "2.2.0"
 
 ### GUIDANCE
 
